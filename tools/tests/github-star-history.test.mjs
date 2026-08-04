@@ -2,56 +2,85 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  buildStarSeries,
+  historyToSeries,
+  mergeObservation,
+  normalizeHistory,
   parseRepositories,
   renderStarHistorySvg,
 } from "../github-star-history.mjs";
 
+const repository = {
+  fullName: "Stonewuu/ai-fusion-video",
+  owner: "Stonewuu",
+  name: "ai-fusion-video",
+};
+
 test("parseRepositories uses the configured default when the variable is blank", () => {
-  assert.deepEqual(parseRepositories("", "Stonewuu/ai-fusion-video"), [
-    { fullName: "Stonewuu/ai-fusion-video", owner: "Stonewuu", name: "ai-fusion-video" },
-  ]);
+  assert.deepEqual(parseRepositories("", repository.fullName), [repository]);
 });
 
-test("parseRepositories accepts comma, whitespace, and newline separators", () => {
+test("parseRepositories accepts separators and removes duplicates", () => {
   const repositories = parseRepositories(
     "Stonewuu/ai-fusion-video,Stonewuu/Stonewuu\nStonewuu/ai-fusion-video",
     "unused/default",
   );
-  assert.deepEqual(repositories.map((repository) => repository.fullName), [
+  assert.deepEqual(repositories.map((item) => item.fullName), [
     "Stonewuu/ai-fusion-video",
     "Stonewuu/Stonewuu",
   ]);
 });
 
-test("buildStarSeries aggregates stargazers by UTC day", () => {
-  const series = buildStarSeries(
-    [
-      { starred_at: "2026-01-04T08:00:00Z" },
-      { starred_at: "2026-01-02T09:00:00Z" },
-      { starred_at: "2026-01-02T18:00:00Z" },
-    ],
-    "2026-01-01T12:00:00Z",
-    "2026-01-05T20:00:00Z",
+test("mergeObservation sorts history and replaces the current day", () => {
+  const history = mergeObservation(
+    {
+      repository: repository.fullName,
+      observations: [
+        { date: "2026-08-04", count: 10 },
+        { date: "2026-08-02", count: 8 },
+      ],
+    },
+    repository,
+    { date: "2026-08-04", count: 9 },
   );
-  assert.deepEqual(series, [
-    { timestamp: Date.UTC(2026, 0, 1), count: 0 },
-    { timestamp: Date.UTC(2026, 0, 2), count: 2 },
-    { timestamp: Date.UTC(2026, 0, 4), count: 3 },
-    { timestamp: Date.UTC(2026, 0, 5), count: 3 },
+  assert.deepEqual(history.observations, [
+    { date: "2026-08-02", count: 8 },
+    { date: "2026-08-04", count: 9 },
   ]);
 });
 
-test("renderStarHistorySvg escapes repository names and renders the total", () => {
+test("normalizeHistory rejects state for another repository", () => {
+  assert.throws(
+    () => normalizeHistory({ repository: "other/repo", observations: [] }, repository),
+    /belongs to another repository/,
+  );
+});
+
+test("historyToSeries converts persisted UTC dates", () => {
+  assert.deepEqual(
+    historyToSeries({
+      repository: repository.fullName,
+      observations: [
+        { date: "2026-08-02", count: 8 },
+        { date: "2026-08-04", count: 9 },
+      ],
+    }),
+    [
+      { timestamp: Date.UTC(2026, 7, 2), count: 8 },
+      { timestamp: Date.UTC(2026, 7, 4), count: 9 },
+    ],
+  );
+});
+
+test("renderStarHistorySvg escapes names and shows the latest count after a drop", () => {
   const svg = renderStarHistorySvg({
     repository: "owner/repo&<test>",
     series: [
-      { timestamp: Date.UTC(2026, 0, 1), count: 0 },
-      { timestamp: Date.UTC(2026, 0, 2), count: 12 },
+      { timestamp: Date.UTC(2026, 7, 1), count: 12 },
+      { timestamp: Date.UTC(2026, 7, 2), count: 10 },
     ],
-    updatedAt: "2026-01-02T12:00:00Z",
+    updatedAt: "2026-08-02T12:00:00Z",
   });
   assert.match(svg, /owner\/repo&amp;&lt;test&gt;/);
-  assert.match(svg, /★ 12/);
+  assert.match(svg, /★ 10/);
   assert.doesNotMatch(svg, /owner\/repo&<test>/);
 });

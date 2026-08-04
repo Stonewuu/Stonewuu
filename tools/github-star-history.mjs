@@ -1,12 +1,12 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const GITHUB_API_ROOT = "https://api.github.com";
 const GITHUB_API_VERSION = "2026-03-10";
 const MAX_REPOSITORIES = 20;
-const STARGAZERS_PER_PAGE = 100;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]+$/;
+const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 
 function requiredValue(value, name) {
   const normalized = value?.trim();
@@ -27,14 +27,14 @@ function validateRepository(repository) {
 }
 
 export function parseRepositories(value, defaultRepository) {
-  const source = value?.trim() || requiredValue(
-    defaultRepository,
-    "STAR_HISTORY_DEFAULT_REPOSITORY",
-  );
+  const configured = value?.split(/[\s,]+/).filter(Boolean) ?? [];
+  const items = configured.length
+    ? configured
+    : [requiredValue(defaultRepository, "STAR_HISTORY_DEFAULT_REPOSITORY")];
   const repositories = [];
   const seen = new Set();
 
-  for (const item of source.split(/[\s,]+/).filter(Boolean)) {
+  for (const item of items) {
     const repository = validateRepository(item);
     const key = repository.fullName.toLowerCase();
     if (!seen.has(key)) {
@@ -42,7 +42,6 @@ export function parseRepositories(value, defaultRepository) {
       repositories.push(repository);
     }
   }
-
   if (repositories.length > MAX_REPOSITORIES) {
     throw new Error(`At most ${MAX_REPOSITORIES} repositories can be generated per run`);
   }
@@ -50,15 +49,13 @@ export function parseRepositories(value, defaultRepository) {
 }
 
 async function githubRequest(url, token) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/vnd.github.star+json",
-      Authorization: `Bearer ${token}`,
-      "User-Agent": "stonewuu-profile-star-history",
-      "X-GitHub-Api-Version": GITHUB_API_VERSION,
-    },
-  });
-
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "stonewuu-profile-star-history",
+    "X-GitHub-Api-Version": GITHUB_API_VERSION,
+  };
+  if (token?.trim()) headers.Authorization = `Bearer ${token.trim()}`;
+  const response = await fetch(url, { headers });
   if (!response.ok) {
     const body = await response.text();
     throw new Error(
@@ -68,47 +65,23 @@ async function githubRequest(url, token) {
   return response;
 }
 
-function nextPageUrl(linkHeader) {
-  if (!linkHeader) return null;
-  for (const part of linkHeader.split(",")) {
-    const match = part.match(/<([^>]+)>;\s*rel="([^"]+)"/);
-    if (match?.[2] === "next") return match[1];
-  }
-  return null;
-}
-
-export async function fetchRepositoryStarHistory(repository, token) {
-  const normalizedToken = requiredValue(token, "GITHUB_TOKEN");
+export async function fetchRepositorySnapshot(repository, token, now = new Date()) {
   const encodedRepository = repository.fullName
     .split("/")
     .map(encodeURIComponent)
     .join("/");
-  const repositoryResponse = await githubRequest(
+  const response = await githubRequest(
     `${GITHUB_API_ROOT}/repos/${encodedRepository}`,
-    normalizedToken,
+    token,
   );
-  const repositoryMetadata = await repositoryResponse.json();
-  const stargazers = [];
-  let url =
-    `${GITHUB_API_ROOT}/repos/${encodedRepository}/stargazers` +
-    `?per_page=${STARGAZERS_PER_PAGE}&page=1`;
-
-  while (url) {
-    const response = await githubRequest(url, normalizedToken);
-    const page = await response.json();
-    if (!Array.isArray(page)) {
-      throw new Error(`${repository.fullName} stargazers response must be an array`);
-    }
-    for (const entry of page) {
-      if (typeof entry?.starred_at !== "string") {
-        throw new Error(`${repository.fullName} response did not include starred_at`);
-      }
-      stargazers.push(entry);
-    }
-    url = nextPageUrl(response.headers.get("link"));
+  const metadata = await response.json();
+  if (!Number.isInteger(metadata.stargazers_count) || metadata.stargazers_count < 0) {
+    throw new Error(`${repository.fullName} did not return a valid stargazers_count`);
   }
-
-  return { createdAt: repositoryMetadata.created_at, stargazers };
+  return {
+    date: formatDate(utcDay(now, "now")),
+    count: metadata.stargazers_count,
+  };
 }
 
 function utcDay(value, name) {
@@ -117,33 +90,108 @@ function utcDay(value, name) {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
-export function buildStarSeries(stargazers, createdAt, updatedAt = new Date()) {
-  if (!Array.isArray(stargazers)) throw new Error("stargazers must be an array");
-  const start = utcDay(createdAt, "createdAt");
-  const end = Math.max(start, utcDay(updatedAt, "updatedAt"));
-  const sorted = stargazers
-    .map((entry, index) => ({
-      day: utcDay(entry?.starred_at, `stargazers[${index}].starred_at`),
-    }))
-    .sort((left, right) => left.day - right.day);
-  const dailyCounts = new Map();
-  let count = 0;
-
-  for (const entry of sorted) {
-    count += 1;
-    dailyCounts.set(entry.day, count);
+function parseDate(value, name) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`${name} must use YYYY-MM-DD`);
   }
+  return utcDay(`${value}T00:00:00Z`, name);
+}
 
-  const points = [{ timestamp: start, count: dailyCounts.get(start) ?? 0 }];
-  for (const [timestamp, dailyCount] of dailyCounts) {
-    if (timestamp > start && timestamp <= end) {
-      points.push({ timestamp, count: dailyCount });
-    }
+function formatDate(timestamp) {
+  return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function validateObservation(value, name) {
+  const date = formatDate(parseDate(value?.date, `${name}.date`));
+  if (!Number.isInteger(value?.count) || value.count < 0) {
+    throw new Error(`${name}.count must be a non-negative integer`);
   }
-  const lastPoint = points.at(-1);
-  if (lastPoint.timestamp === end) lastPoint.count = count;
-  else points.push({ timestamp: end, count });
-  return points;
+  return { date, count: value.count };
+}
+
+export function normalizeHistory(history, repository) {
+  if (!history || typeof history !== "object") {
+    throw new Error(`${repository.fullName} history must be an object`);
+  }
+  if (history.repository?.toLowerCase() !== repository.fullName.toLowerCase()) {
+    throw new Error(`${repository.fullName} history belongs to another repository`);
+  }
+  if (!Array.isArray(history.observations)) {
+    throw new Error(`${repository.fullName} history observations must be an array`);
+  }
+  const observationsByDate = new Map();
+  history.observations.forEach((value, index) => {
+    const observation = validateObservation(value, `observations[${index}]`);
+    observationsByDate.set(observation.date, observation);
+  });
+  return {
+    repository: repository.fullName,
+    observations: [...observationsByDate.values()].sort((left, right) =>
+      left.date.localeCompare(right.date),
+    ),
+  };
+}
+
+export function mergeObservation(history, repository, observation) {
+  const normalized = normalizeHistory(history, repository);
+  const current = validateObservation(observation, "observation");
+  const observationsByDate = new Map(
+    normalized.observations.map((item) => [item.date, item]),
+  );
+  observationsByDate.set(current.date, current);
+  return {
+    repository: repository.fullName,
+    observations: [...observationsByDate.values()].sort((left, right) =>
+      left.date.localeCompare(right.date),
+    ),
+  };
+}
+
+async function readJsonFile(path) {
+  try {
+    return JSON.parse(await readFile(path, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+async function fetchPublishedHistory(baseUrl, repository) {
+  const normalizedBaseUrl = requiredValue(
+    baseUrl,
+    "STAR_HISTORY_PAGES_BASE_URL",
+  ).replace(/\/+$/, "");
+  const stateUrl =
+    `${normalizedBaseUrl}/star-history/${repository.owner}/${repository.name}.json` +
+    `?refresh=${Date.now()}`;
+  const response = await fetch(stateUrl, { cache: "no-store" });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(
+      `Published history request failed for ${repository.fullName} ` +
+        `(${response.status} ${response.statusText})`,
+    );
+  }
+  return response.json();
+}
+
+async function loadHistory({ baseUrl, repository, seedDirectory }) {
+  const published = await fetchPublishedHistory(baseUrl, repository);
+  if (published) return normalizeHistory(published, repository);
+  const seedPath = resolve(seedDirectory, repository.owner, `${repository.name}.json`);
+  const seed = await readJsonFile(seedPath);
+  if (seed) return normalizeHistory(seed, repository);
+  return { repository: repository.fullName, observations: [] };
+}
+
+export function historyToSeries(history) {
+  if (!Array.isArray(history?.observations) || history.observations.length === 0) {
+    throw new Error("history must contain at least one observation");
+  }
+  return history.observations.map((observation, index) => ({
+    timestamp: parseDate(observation.date, `observations[${index}].date`),
+    count: observation.count,
+  }));
 }
 
 function escapeXml(value) {
@@ -153,10 +201,6 @@ function escapeXml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&apos;");
-}
-
-function formatDate(timestamp) {
-  return new Date(timestamp).toISOString().slice(0, 10);
 }
 
 function formatMonth(timestamp) {
@@ -176,26 +220,30 @@ export function renderStarHistorySvg({ repository, series, updatedAt = new Date(
   if (!Array.isArray(series) || series.length === 0) {
     throw new Error("series must contain at least one point");
   }
+  const displaySeries = series.length === 1
+    ? [{ timestamp: series[0].timestamp - DAY_MILLISECONDS, count: series[0].count }, ...series]
+    : series;
   const width = 1000;
   const height = 560;
   const plot = { left: 78, right: 34, top: 118, bottom: 76 };
   const plotWidth = width - plot.left - plot.right;
   const plotHeight = height - plot.top - plot.bottom;
-  const start = series[0].timestamp;
-  const end = Math.max(start + 1, series.at(-1).timestamp);
-  const totalStars = series.at(-1).count;
-  const step = niceStep(totalStars);
-  const yMaximum = Math.max(step, Math.ceil(totalStars / step) * step);
+  const start = displaySeries[0].timestamp;
+  const end = displaySeries.at(-1).timestamp;
+  const totalStars = displaySeries.at(-1).count;
+  const maximumStars = Math.max(...displaySeries.map((point) => point.count));
+  const step = niceStep(maximumStars);
+  const yMaximum = Math.max(step, Math.ceil(maximumStars / step) * step);
   const x = (timestamp) => plot.left + ((timestamp - start) / (end - start)) * plotWidth;
   const y = (count) => plot.top + plotHeight - (count / yMaximum) * plotHeight;
-  const coordinates = series.map(
+  const coordinates = displaySeries.map(
     (point) => `${x(point.timestamp).toFixed(2)} ${y(point.count).toFixed(2)}`,
   );
   const linePath = coordinates
     .map((coordinate, index) => `${index === 0 ? "M" : "L"} ${coordinate}`)
     .join(" ");
   const areaPath =
-    `${linePath} L ${x(series.at(-1).timestamp).toFixed(2)} ` +
+    `${linePath} L ${x(displaySeries.at(-1).timestamp).toFixed(2)} ` +
     `${(plot.top + plotHeight).toFixed(2)} L ${x(start).toFixed(2)} ` +
     `${(plot.top + plotHeight).toFixed(2)} Z`;
   const yGrid = [];
@@ -218,7 +266,7 @@ export function renderStarHistorySvg({ repository, series, updatedAt = new Date(
     );
   }
 
-  const lastX = x(series.at(-1).timestamp).toFixed(2);
+  const lastX = x(displaySeries.at(-1).timestamp).toFixed(2);
   const lastY = y(totalStars).toFixed(2);
   const safeRepository = escapeXml(repository);
   const safeUpdatedAt = escapeXml(formatDate(utcDay(updatedAt, "updatedAt")));
@@ -227,7 +275,7 @@ export function renderStarHistorySvg({ repository, series, updatedAt = new Date(
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title description">
   <title id="title">GitHub Star History for ${safeRepository}</title>
-  <desc id="description">${safeRepository} has ${safeTotalStars} current stargazers as of ${safeUpdatedAt}.</desc>
+  <desc id="description">${safeRepository} has ${safeTotalStars} stars as of ${safeUpdatedAt}.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0d1117"/><stop offset="100%" stop-color="#161b22"/></linearGradient>
     <linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#58a6ff" stop-opacity="0.42"/><stop offset="100%" stop-color="#58a6ff" stop-opacity="0.03"/></linearGradient>
@@ -262,49 +310,51 @@ export function renderStarHistorySvg({ repository, series, updatedAt = new Date(
 function renderIndex(generated) {
   const cards = generated
     .map(({ repository, relativePath }) => `
-      <article>
-        <h2>${escapeXml(repository)}</h2>
-        <a href="./${escapeXml(relativePath)}"><img src="./${escapeXml(relativePath)}" alt="${escapeXml(repository)} Star History"></a>
-      </article>`)
+      <article><h2>${escapeXml(repository)}</h2><a href="./${escapeXml(relativePath)}"><img src="./${escapeXml(relativePath)}" alt="${escapeXml(repository)} Star History"></a></article>`)
     .join("");
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Repository Star History</title>
-  <style>body{max-width:1100px;margin:40px auto;padding:0 20px;font-family:system-ui,sans-serif;color:#24292f}h1{text-align:center}article{margin:32px 0}h2{font-size:18px}img{display:block;width:100%;height:auto;border-radius:18px}</style>
-</head>
-<body><h1>Repository Star History</h1>${cards}</body>
-</html>
-`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Repository Star History</title><style>body{max-width:1100px;margin:40px auto;padding:0 20px;font-family:system-ui,sans-serif;color:#24292f}h1{text-align:center}article{margin:32px 0}h2{font-size:18px}img{display:block;width:100%;height:auto;border-radius:18px}</style></head><body><h1>Repository Star History</h1>${cards}</body></html>\n`;
 }
 
 async function main() {
-  const token = requiredValue(process.env.GITHUB_TOKEN, "GITHUB_TOKEN");
   const repositories = parseRepositories(
     process.env.STAR_HISTORY_REPOSITORIES,
     process.env.STAR_HISTORY_DEFAULT_REPOSITORY,
   );
   const siteDirectory = resolve(process.env.STAR_HISTORY_SITE_DIR?.trim() || "_site");
+  const seedDirectory = resolve(process.env.STAR_HISTORY_SEED_DIR?.trim() || "star-history-seeds");
+  const pagesBaseUrl = requiredValue(
+    process.env.STAR_HISTORY_PAGES_BASE_URL,
+    "STAR_HISTORY_PAGES_BASE_URL",
+  );
   const updatedAt = new Date();
   const generated = [];
 
   for (const repository of repositories) {
-    const history = await fetchRepositoryStarHistory(repository, token);
-    const series = buildStarSeries(history.stargazers, history.createdAt, updatedAt);
-    const svg = renderStarHistorySvg({
+    const [history, snapshot] = await Promise.all([
+      loadHistory({ baseUrl: pagesBaseUrl, repository, seedDirectory }),
+      fetchRepositorySnapshot(repository, process.env.GITHUB_TOKEN, updatedAt),
+    ]);
+    const updatedHistory = mergeObservation(history, repository, snapshot);
+    const relativeBase = `star-history/${repository.owner}/${repository.name}`;
+    const svgPath = resolve(siteDirectory, ...`${relativeBase}.svg`.split("/"));
+    const jsonPath = resolve(siteDirectory, ...`${relativeBase}.json`.split("/"));
+    await mkdir(dirname(svgPath), { recursive: true });
+    await writeFile(
+      svgPath,
+      renderStarHistorySvg({
+        repository: repository.fullName,
+        series: historyToSeries(updatedHistory),
+        updatedAt,
+      }),
+      "utf8",
+    );
+    await writeFile(jsonPath, `${JSON.stringify(updatedHistory, null, 2)}\n`, "utf8");
+    generated.push({
       repository: repository.fullName,
-      series,
-      updatedAt,
+      relativePath: `${relativeBase}.svg`,
     });
-    const relativePath = `star-history/${repository.owner}/${repository.name}.svg`;
-    const outputPath = resolve(siteDirectory, ...relativePath.split("/"));
-    await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, svg, "utf8");
-    generated.push({ repository: repository.fullName, relativePath });
     console.log(
-      `Generated ${repository.fullName} with ${history.stargazers.length.toLocaleString("en-US")} stargazers`,
+      `Generated ${repository.fullName} with ${snapshot.count.toLocaleString("en-US")} current stars and ${updatedHistory.observations.length} observations`,
     );
   }
 

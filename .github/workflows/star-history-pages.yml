@@ -33,9 +33,11 @@ jobs:
 
       - name: Generate repository star histories
         env:
-          GITHUB_TOKEN: ${{ secrets.STAR_HISTORY_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STAR_HISTORY_REPOSITORIES: ${{ vars.STAR_HISTORY_REPOSITORIES }}
           STAR_HISTORY_DEFAULT_REPOSITORY: Stonewuu/ai-fusion-video
+          STAR_HISTORY_PAGES_BASE_URL: https://stonewuu.github.io/Stonewuu
+          STAR_HISTORY_SEED_DIR: star-history-seeds
           STAR_HISTORY_SITE_DIR: _site
         run: node tools/github-star-history.mjs
 
