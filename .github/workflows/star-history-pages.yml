@@ -1,0 +1,54 @@
+name: Generate Repository Star History
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: profile-star-history-pages
+  cancel-in-progress: false
+
+jobs:
+  generate-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout profile repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Generate repository star histories
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STAR_HISTORY_REPOSITORIES: ${{ vars.STAR_HISTORY_REPOSITORIES }}
+          STAR_HISTORY_DEFAULT_REPOSITORY: Stonewuu/ai-fusion-video
+          STAR_HISTORY_PAGES_BASE_URL: https://stonewuu.github.io/Stonewuu
+          STAR_HISTORY_SEED_DIR: star-history-seeds
+          STAR_HISTORY_SITE_DIR: _site
+        run: node tools/github-star-history.mjs
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
