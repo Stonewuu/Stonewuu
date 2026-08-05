@@ -7,6 +7,7 @@ const GITHUB_API_VERSION = "2026-03-10";
 const MAX_REPOSITORIES = 20;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]+$/;
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
+const CURVE_SMOOTHNESS = 0.35;
 
 function requiredValue(value, name) {
   const normalized = value?.trim();
@@ -225,6 +226,50 @@ function niceStep(maxValue, desiredTicks = 5) {
   return multiplier * magnitude;
 }
 
+function curvedLinePath(points) {
+  const first = points[0];
+  let path = `M ${first.x.toFixed(2)} ${first.y.toFixed(2)}`;
+  if (points.length === 1) return path;
+
+  const slopes = points.map((point, index) => {
+    const previous = points[Math.max(0, index - 1)];
+    const next = points[Math.min(points.length - 1, index + 1)];
+    return (next.y - previous.y) / (next.x - previous.x);
+  });
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const current = points[index];
+    const next = points[index + 1];
+    const deltaX = next.x - current.x;
+    const deltaY = next.y - current.y;
+    const firstLinearY = current.y + deltaY / 3;
+    const secondLinearY = current.y + (deltaY * 2) / 3;
+    const firstSmoothY = current.y + (slopes[index] * deltaX) / 3;
+    const secondSmoothY = next.y - (slopes[index + 1] * deltaX) / 3;
+    const minimumY = Math.min(current.y, next.y);
+    const maximumY = Math.max(current.y, next.y);
+    const blendAndClamp = (linear, smooth) =>
+      Math.min(
+        maximumY,
+        Math.max(minimumY, linear + (smooth - linear) * CURVE_SMOOTHNESS),
+      );
+    const firstControl = {
+      x: current.x + deltaX / 3,
+      y: blendAndClamp(firstLinearY, firstSmoothY),
+    };
+    const secondControl = {
+      x: current.x + (deltaX * 2) / 3,
+      y: blendAndClamp(secondLinearY, secondSmoothY),
+    };
+    path +=
+      ` C ${firstControl.x.toFixed(2)} ${firstControl.y.toFixed(2)}` +
+      ` ${secondControl.x.toFixed(2)} ${secondControl.y.toFixed(2)}` +
+      ` ${next.x.toFixed(2)} ${next.y.toFixed(2)}`;
+  }
+
+  return path;
+}
+
 export function renderStarHistorySvg({ repository, series, updatedAt = new Date() }) {
   if (!Array.isArray(series) || series.length === 0) {
     throw new Error("series must contain at least one point");
@@ -245,12 +290,11 @@ export function renderStarHistorySvg({ repository, series, updatedAt = new Date(
   const yMaximum = Math.max(step, Math.ceil(maximumStars / step) * step);
   const x = (timestamp) => plot.left + ((timestamp - start) / (end - start)) * plotWidth;
   const y = (count) => plot.top + plotHeight - (count / yMaximum) * plotHeight;
-  const coordinates = displaySeries.map(
-    (point) => `${x(point.timestamp).toFixed(2)} ${y(point.count).toFixed(2)}`,
-  );
-  const linePath = coordinates
-    .map((coordinate, index) => `${index === 0 ? "M" : "L"} ${coordinate}`)
-    .join(" ");
+  const coordinates = displaySeries.map((point) => ({
+    x: x(point.timestamp),
+    y: y(point.count),
+  }));
+  const linePath = curvedLinePath(coordinates);
   const areaPath =
     `${linePath} L ${x(displaySeries.at(-1).timestamp).toFixed(2)} ` +
     `${(plot.top + plotHeight).toFixed(2)} L ${x(start).toFixed(2)} ` +
