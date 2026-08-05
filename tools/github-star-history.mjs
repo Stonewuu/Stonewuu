@@ -188,10 +188,19 @@ export function historyToSeries(history) {
   if (!Array.isArray(history?.observations) || history.observations.length === 0) {
     throw new Error("history must contain at least one observation");
   }
-  return history.observations.map((observation, index) => ({
+  const series = history.observations.map((observation, index) => ({
     timestamp: parseDate(observation.date, `observations[${index}].date`),
     count: observation.count,
   }));
+  const firstStarIndex = series.findIndex((point) => point.count > 0);
+
+  if (firstStarIndex <= 0) return series;
+
+  const firstStar = series[firstStarIndex];
+  return [
+    { timestamp: firstStar.timestamp - DAY_MILLISECONDS, count: 0 },
+    ...series.slice(firstStarIndex),
+  ];
 }
 
 function escapeXml(value) {
