@@ -71,6 +71,24 @@ test("historyToSeries converts persisted UTC dates", () => {
   );
 });
 
+test("historyToSeries starts one day before the first star", () => {
+  assert.deepEqual(
+    historyToSeries({
+      repository: repository.fullName,
+      observations: [
+        { date: "2026-03-16", count: 0 },
+        { date: "2026-04-17", count: 173 },
+        { date: "2026-04-18", count: 237 },
+      ],
+    }),
+    [
+      { timestamp: Date.UTC(2026, 3, 16), count: 0 },
+      { timestamp: Date.UTC(2026, 3, 17), count: 173 },
+      { timestamp: Date.UTC(2026, 3, 18), count: 237 },
+    ],
+  );
+});
+
 test("renderStarHistorySvg escapes names and shows the latest count after a drop", () => {
   const svg = renderStarHistorySvg({
     repository: "owner/repo&<test>",
