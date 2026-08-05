@@ -102,3 +102,23 @@ test("renderStarHistorySvg escapes names and shows the latest count after a drop
   assert.match(svg, /★ 10/);
   assert.doesNotMatch(svg, /owner\/repo&<test>/);
 });
+
+test("renderStarHistorySvg draws a gentle cubic curve through observations", () => {
+  const svg = renderStarHistorySvg({
+    repository: repository.fullName,
+    series: [
+      { timestamp: Date.UTC(2026, 7, 1), count: 0 },
+      { timestamp: Date.UTC(2026, 7, 2), count: 10 },
+      { timestamp: Date.UTC(2026, 7, 3), count: 12 },
+    ],
+    updatedAt: "2026-08-03T12:00:00Z",
+  });
+  const linePath = svg.match(
+    /<path d="([^"]+)" fill="none" stroke="#58a6ff"/,
+  )?.[1];
+
+  assert.ok(linePath);
+  assert.match(linePath, /^M 78\.00 484\.00 C /);
+  assert.match(linePath, / 522\.00 240\.00 C /);
+  assert.match(linePath, / 966\.00 191\.20$/);
+});
