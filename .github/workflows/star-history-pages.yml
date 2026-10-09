@@ -1,6 +1,12 @@
 name: Generate Repository Star History
 
 on:
+  push:
+    branches:
+      - master
+    paths:
+      - "public/**"
+      - ".github/workflows/star-history-pages.yml"
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
@@ -40,6 +46,9 @@ jobs:
           STAR_HISTORY_SEED_DIR: star-history-seeds
           STAR_HISTORY_SITE_DIR: _site
         run: node tools/github-star-history.mjs
+
+      - name: Copy static pages and media
+        run: cp -R public/. _site/
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
