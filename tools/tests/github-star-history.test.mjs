@@ -114,7 +114,7 @@ test("renderStarHistorySvg draws a gentle cubic curve through observations", () 
     updatedAt: "2026-08-03T12:00:00Z",
   });
   const linePath = svg.match(
-    /<path d="([^"]+)" fill="none" stroke="#58a6ff"/,
+    /<path d="([^"]+)" fill="none" stroke="#0969da"/,
   )?.[1];
 
   assert.ok(linePath);

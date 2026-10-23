@@ -2,6 +2,8 @@
 
 This profile repository generates Star History SVGs for selected repositories and publishes them with GitHub Pages. The workflow runs every six hours and can also be started manually.
 
+Charts use a fixed light theme with a white background, dark labels, and a blue trend line, including when embedded in a dark-themed README viewer.
+
 ## Authentication and history
 
 No custom secret or personal access token is required. The workflow uses its built-in `GITHUB_TOKEN` only to read each public repository's `stargazers_count`, an endpoint that is not affected by GitHub's Stargazers-list restriction.

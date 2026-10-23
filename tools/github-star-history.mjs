@@ -330,23 +330,23 @@ export function renderStarHistorySvg({ repository, series, updatedAt = new Date(
   <title id="title">GitHub Star History for ${safeRepository}</title>
   <desc id="description">${safeRepository} has ${safeTotalStars} stars as of ${safeUpdatedAt}.</desc>
   <defs>
-    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0d1117"/><stop offset="100%" stop-color="#161b22"/></linearGradient>
-    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#58a6ff" stop-opacity="0.42"/><stop offset="100%" stop-color="#58a6ff" stop-opacity="0.03"/></linearGradient>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#f6f8fa"/></linearGradient>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0969da" stop-opacity="0.16"/><stop offset="100%" stop-color="#0969da" stop-opacity="0.02"/></linearGradient>
     <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
   <style>
-    .title { fill: #f0f6fc; font: 700 28px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    .subtitle { fill: #8b949e; font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    .count { fill: #f0f6fc; font: 700 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-anchor: end; }
-    .count-label { fill: #8b949e; font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-anchor: end; }
-    .grid { stroke: #30363d; stroke-width: 1; }
+    .title { fill: #1f2328; font: 700 28px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .subtitle { fill: #59636e; font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .count { fill: #1f2328; font: 700 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-anchor: end; }
+    .count-label { fill: #59636e; font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-anchor: end; }
+    .grid { stroke: #d1d9e0; stroke-width: 1; }
     .grid.vertical { stroke-opacity: 0.35; }
-    .axis { fill: #8b949e; font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .axis { fill: #59636e; font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     .y-axis { text-anchor: end; dominant-baseline: middle; }
     .x-axis { text-anchor: middle; }
   </style>
   <rect width="${width}" height="${height}" rx="18" fill="url(#background)"/>
-  <rect x="0.5" y="0.5" width="${width - 1}" height="${height - 1}" rx="17.5" fill="none" stroke="#30363d"/>
+  <rect x="0.5" y="0.5" width="${width - 1}" height="${height - 1}" rx="17.5" fill="none" stroke="#d1d9e0"/>
   <text x="${plot.left}" y="52" class="title">GitHub Star History</text>
   <text x="${plot.left}" y="80" class="subtitle">${safeRepository} · Updated ${safeUpdatedAt} UTC</text>
   <text x="${width - plot.right}" y="50" class="count">★ ${safeTotalStars}</text>
@@ -354,8 +354,8 @@ export function renderStarHistorySvg({ repository, series, updatedAt = new Date(
   ${yGrid.join("\n  ")}
   ${xLabels.join("\n  ")}
   <path d="${areaPath}" fill="url(#area)"/>
-  <path d="${linePath}" fill="none" stroke="#58a6ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="${lastX}" cy="${lastY}" r="7" fill="#58a6ff" filter="url(#glow)"/>
+  <path d="${linePath}" fill="none" stroke="#0969da" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="${lastX}" cy="${lastY}" r="7" fill="#0969da" filter="url(#glow)"/>
 </svg>
 `;
 }
