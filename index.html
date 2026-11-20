@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>仓库流量 · AI Fusion Video</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%23242743'/%3E%3Cpath d='M7 27 16 17l5 5 11-13' fill='none' stroke='%23abf1d7' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <style>
+:root {
+  color-scheme: light;
+  --bg: #f4f5f8;
+  --panel: #fff;
+  --text: #202437;
+  --muted: #626b81;
+  --line: #e3e6ef;
+  --soft: #f1f2f8;
+  --active: #fff;
+  --violet: #6755d6;
+  --green: #087d74;
+  --focus: #6857d9;
+  --hover: #f6f6fd;
+  --tip: #23253d;
+  --tip-text: #fbfaff;
+  font-family: Inter, "Segoe UI Variable", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #14151d; --panel: #1c1e29; --text: #eeeff7; --muted: #a9b0c6; --line: #353849;
+    --soft: #292b3a; --active: #3b3e50; --violet: #ab9cff; --green: #65d8c7; --focus: #b5aaff;
+    --hover: #262837; --tip: #ebe9fc; --tip-text: #242337;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14151d; --panel: #1c1e29; --text: #eeeff7; --muted: #a9b0c6; --line: #353849;
+  --soft: #292b3a; --active: #3b3e50; --violet: #ab9cff; --green: #65d8c7; --focus: #b5aaff;
+  --hover: #262837; --tip: #ebe9fc; --tip-text: #242337;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+button, input { font: inherit; font-variant-numeric: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: .4; }
+a { color: inherit; text-decoration: none; }
+button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--focus); outline-offset: 3px;
+}
+[hidden] { display: none !important; }
+.symbols { position: absolute; width: 0; height: 0; overflow: hidden; }
+.icon { display: inline-block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.icon.small { width: 15px; height: 15px; }
+.shell { width: min(calc(100% - 80px), 1184px); margin-inline: auto; }
+.masthead { border-bottom: 1px solid var(--line); background: var(--panel); }
+.mast-content { display: flex; justify-content: space-between; align-items: center; min-height: 68px; gap: 16px; }
+.repo-link, .mast-actions, .archive-link, .page-footer a, .page-footer > span { display: inline-flex; align-items: center; }
+.repo-link { gap: 10px; font-size: 15px; min-width: 0; border-radius: 6px; }
+.repo-link strong { letter-spacing: -.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-mark { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 10px; background: #262840; margin-right: 3px; }
+.brand-mark svg { width: 28px; height: 28px; fill: none; stroke: #c0efd9; stroke-width: 3.2; stroke-linejoin: round; stroke-linecap: round; }
+.brand-trail { stroke: #b7afff; stroke-width: 2.2; }
+.repo-owner, .slash, .muted { color: var(--muted); }
+.slash { opacity: .58; }
+.mast-actions { gap: 12px; }
+.archive-link { gap: 7px; font-size: 13px; color: var(--muted); padding: 8px 3px; border-radius: 5px; }
+.archive-link:hover, .page-footer a:hover { color: var(--violet); }
+.icon-button, .outline-button { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--text); transition: background-color 150ms; }
+.icon-button { width: 36px; padding: 0; }
+.outline-button { padding-inline: 12px; font-size: 13px; font-weight: 600; }
+.icon-button:hover:not(:disabled), .outline-button:hover:not(:disabled) { background: var(--hover); }
+main.shell { padding-block: 28px; }
+.overview { position: relative; isolation: isolate; overflow: hidden; border-radius: 22px; padding: 30px 36px 32px; color: #f9f9ff; background: radial-gradient(ellipse at 94% -56%, #4d4976 0%, transparent 66%), linear-gradient(115deg, #202236 5%, #2b2b49 82%, #32304d); border: 1px solid #3a3b54; }
+.hero-head, .panel-head, .plot-head, .plot-footer, .table-footer, .page-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+h1, h2, p { margin: 0; }
+h1 { font-size: clamp(28px, 3vw, 38px); font-weight: 660; line-height: 1.24; letter-spacing: -.045em; }
+h2 { font-size: 21px; line-height: 1.45; font-weight: 670; letter-spacing: -.035em; }
+.hero-range { color: #c6c8dc; font-size: 13px; margin-top: 7px; }
+.window-tag { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; padding: 6px 10px; border: 1px solid #66647e; border-radius: 8px; color: #e6e5f3; background: #ffffff08; font-size: 12px; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); margin-top: 28px; padding-top: 23px; border-top: 1px solid #ffffff24; }
+.kpi { min-width: 0; padding-inline: 24px; border-left: 1px solid #ffffff20; }
+.kpi:first-child { padding-left: 0; border-left: 0; }
+.kpi:last-child { padding-right: 0; }
+.kpi-label { font-size: 13px; color: #d3d3e5; }
+.kpi-value-row { margin-top: 5px; display: flex; align-items: baseline; gap: 12px; justify-content: space-between; }
+.kpi-value { font-size: clamp(27px, 3vw, 43px); font-weight: 600; line-height: 1.12; letter-spacing: -.055em; }
+.spark { display: block; width: min(32%, 77px); height: 25px; overflow: visible; flex: none; }
+.panel { border: 1px solid var(--line); border-radius: 18px; background: var(--panel); margin-top: 20px; }
+.trend, .details { padding: 24px 28px; }
+.seg { padding: 3px; display: inline-flex; align-items: center; gap: 2px; min-height: 36px; border-radius: 10px; background: var(--soft); }
+.seg button { display: inline-flex; align-items: center; justify-content: center; height: 30px; min-width: 34px; padding-inline: 12px; color: var(--muted); background: transparent; border: 0; font-size: 12px; font-weight: 600; border-radius: 7px; white-space: nowrap; transition: background-color 160ms, color 160ms; }
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"], .seg button[aria-expanded="true"] { background: var(--active); color: var(--text); box-shadow: 0 1px 3px #1718321a; }
+.seg button:focus-visible { outline-offset: 1px; }
+.plot-head { margin-top: 24px; margin-bottom: 6px; }
+.legend { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.plot-metrics { display: flex; gap: 4px 14px; align-items: center; flex-wrap: wrap; }
+#legend-basis { font-size: 12px; color: var(--muted); }
+.series-key b { font-weight: 650; }
+.series-key { display: inline-flex; align-items: center; gap: 7px; border: 0; background: transparent; border-radius: 6px; color: var(--text); font-size: 13px; min-height: 36px; padding: 2px 3px; }
+.series-key[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; }
+.series-key[aria-pressed="false"] .swatch { opacity: .4; }
+.swatch { width: 22px; border-top: 3px solid var(--violet); display: inline-block; border-radius: 2px; }
+.swatch.views { border-top: 3px dashed var(--green); }
+.plot-wrap { position: relative; margin: 0; }
+#plot { display: block; width: 100%; height: 266px; border-radius: 6px; overflow: visible; touch-action: pan-y; }
+.axis { fill: var(--muted); font: 11px Inter,"Segoe UI",sans-serif; }
+.grid { stroke: var(--line); stroke-dasharray: 3 5; }
+.baseline { stroke: var(--line); }
+.plot-line { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.6; }
+.clones-line { stroke: var(--violet); }
+.views-line { stroke: var(--green); stroke-dasharray: 7 4; }
+.guide { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; }
+.dot { stroke: var(--panel); stroke-width: 2; }
+.tooltip { position: absolute; z-index: 1; pointer-events: none; min-width: 156px; width: max-content; max-width: 95%; border-radius: 11px; padding: 11px 13px; color: var(--tip-text); background: var(--tip); box-shadow: 0 6px 22px #17182d24; font-size: 12px; }
+.tooltip strong { display: block; margin-bottom: 5px; }
+.tip-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-top: 3px; }
+.tip-row span { display: inline-flex; gap: 6px; align-items: center; }
+.tip-row i { width: 7px; height: 7px; border-radius: 50%; background: #afa2ff; }
+.tip-row i.views { background: #64cfc0; border-radius: 2px; }
+.empty-chart { position: absolute; inset: 0; display: grid; place-content: center; color: var(--muted); font-size: 14px; pointer-events: none; }
+.plot-footer, .table-footer, .page-footer, .muted { font-size: 12px; color: var(--muted); }
+.plot-footer { padding-top: 8px; }
+.custom-range { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-top: 16px; padding: 12px; background: var(--soft); border-radius: 10px; }
+.custom-range label { display: flex; flex-direction: column; min-width: 0; gap: 6px; color: var(--muted); font-size: 12px; }
+.custom-range input { min-height: 36px; min-width: 0; width: 148px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); padding: 4px 8px; }
+.title-inline, .pager { display: flex; align-items: center; gap: 12px; }
+.table-scroll { overflow-x: auto; margin: 14px -4px 0; padding: 4px; border-radius: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+th, td { padding: 11px 14px; text-align: right; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); background: var(--soft); font-weight: 550; }
+th:first-child { border-radius: 7px 0 0 7px; }
+th:last-child { border-radius: 0 7px 7px 0; }
+td:first-child, th:first-child { text-align: left; }
+tbody tr:hover { background: var(--hover); }
+tbody .table-date { background: transparent; color: var(--text); font-weight: 520; }
+.table-footer { margin-top: 10px; }
+.pager { gap: 8px; }
+.pager span { min-width: 34px; text-align: center; }
+.page-footer { margin: 20px 0 0; padding: 0 3px; }
+.page-footer > span, .page-footer a { gap: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (min-width: 1500px) { #plot { height: 302px; } }
+@media (max-width: 840px) {
+  .shell { width: calc(100% - 40px); }
+  .overview { padding: 25px 25px 27px; }
+  .kpi { padding-inline: 14px; }
+  .kpi-value-row { gap: 6px; }
+  .trend, .details { padding: 20px; }
+}
+@media (max-width: 620px) {
+  .shell { width: calc(100% - 24px); }
+  .mast-content { min-height: 56px; gap: 8px; }
+  .repo-link { gap: 5px; font-size: 13px; }
+  .brand-mark { width: 28px; height: 28px; border-radius: 8px; }
+  .mast-actions { gap: 6px; }
+  .archive-link .icon.small { display: none; }
+  .archive-link { font-size: 12px; }
+  main.shell { padding-block: 14px; }
+  .overview { padding: 20px; border-radius: 16px; }
+  .hero-head { align-items: flex-start; gap: 6px; }
+  .hero-range { font-size: 11px; }
+  .window-tag { padding: 5px 7px; font-size: 11px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 17px 0; margin-top: 18px; padding-top: 16px; }
+  .kpi:nth-child(odd) { padding: 0 15px 0 0; border-left: 0; }
+  .kpi:nth-child(even) { padding: 0 0 0 15px; }
+  .kpi-label { font-size: 12px; }
+  .kpi-value { font-size: 29px; }
+  .spark { max-width: 46px; }
+  .panel { margin-top: 12px; border-radius: 14px; }
+  .trend, .details { padding: 16px; }
+  .trend > .panel-head { align-items: flex-start; flex-direction: column; gap: 12px; }
+  h2 { font-size: 19px; }
+  .ranges { max-width: 100%; }
+  .ranges button { min-width: 28px; padding-inline: 9px; }
+  .units button { padding-inline: 7px; }
+  .plot-head { margin-top: 13px; gap: 4px; flex-wrap: wrap; }
+  .plot-metrics { width: 100%; gap: 0 8px; }
+  .legend { gap: 2px 7px; }
+  .series-key { font-size: 12px; gap: 4px; }
+  .swatch { width: 15px; }
+  #plot { height: 230px; }
+  .plot-footer, .page-footer { gap: 6px; font-size: 11px; }
+  .custom-range { gap: 9px; }
+  .custom-range input { width: 135px; }
+  th, td { padding: 10px 8px; }
+  .title-inline { gap: 8px; }
+}
+@media (max-width: 370px) {
+  .repo-owner, .repo-link .slash { display: none; }
+  .ranges button { padding-inline: 6px; }
+  .plot-head { row-gap: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation: none !important; }
+}
+
+</style>
+</head>
+<body>
+  <svg class="symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-repo" viewBox="0 0 24 24"><path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 1 5 17.5zM5 17.5A2.5 2.5 0 0 1 7.5 15H20M9 6h7"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M6 18 18 6M7 6h11v11"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/></symbol>
+    <symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="m14.5 5-7 7 7 7"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="m9.5 5 7 7-7 7"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-bars" viewBox="0 0 24 24"><path d="M5 19v-6m7 6V5m7 14V9"/></symbol>
+  </svg>
+  <header class="masthead">
+    <div class="shell mast-content">
+      <a class="repo-link" id="repo-link" aria-label="在 GitHub 查看项目仓库">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 36 36"><path d="m6 24 8-9 5 5L30 8"/><path class="brand-trail" d="m7 29 8-9"/></svg></span>
+        <span id="repo-owner" class="repo-owner"></span><span class="slash">/</span><strong id="repo-name"></strong>
+      </a>
+      <div class="mast-actions">
+        <a class="archive-link" id="archive-link"><svg class="icon"><use href="#i-repo"/></svg><span>数据归档</span><svg class="icon small"><use href="#i-arrow"/></svg></a>
+        <button type="button" id="theme" class="icon-button" aria-label="切换明暗主题" title="切换明暗主题"><svg class="icon"><use href="#i-theme"/></svg></button>
+      </div>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="overview" aria-labelledby="report-title">
+      <div class="hero-head">
+        <div><h1 id="report-title">仓库流量</h1><p id="summary-range" class="hero-range"></p></div>
+        <span class="window-tag"><svg class="icon small"><use href="#i-calendar"/></svg>最近 14 天</span>
+      </div>
+      <div class="kpis" id="metrics"></div>
+    </section>
+
+    <section class="panel trend" aria-labelledby="trend-heading">
+      <div class="panel-head">
+        <h2 id="trend-heading">流量趋势</h2>
+        <div class="seg ranges" id="ranges" role="group" aria-label="趋势时间范围">
+          <button type="button" data-range="7">7 天</button>
+          <button type="button" data-range="14" aria-pressed="true">14 天</button>
+          <button type="button" data-range="30">30 天</button>
+          <button type="button" data-range="90">90 天</button>
+          <button type="button" data-range="all">全部</button>
+          <button type="button" data-range="custom" aria-label="自选日期" title="自选日期" aria-expanded="false" aria-controls="custom-range"><svg class="icon small"><use href="#i-calendar"/></svg></button>
+        </div>
+      </div>
+      <form class="custom-range" id="custom-range" hidden>
+        <label>开始日期<input type="date" id="from-date" required></label>
+        <label>结束日期<input type="date" id="to-date" required></label>
+        <button class="outline-button" type="submit">应用日期</button>
+      </form>
+      <div class="plot-head">
+        <div class="plot-metrics"><span id="legend-basis"></span><div class="legend" id="legend" role="group" aria-label="显示的数据系列"></div></div>
+        <div class="seg units" id="units" role="group" aria-label="统计指标">
+          <button type="button" data-unit="count" aria-pressed="true">次数</button>
+          <button type="button" data-unit="uniques">每日去重人数</button>
+        </div>
+      </div>
+      <div class="plot-wrap" id="plot-wrap">
+        <svg id="plot" tabindex="0" role="group" aria-label="流量折线图，使用左右方向键按天查看，Home 和 End 跳到首尾" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="tooltip" class="tooltip" hidden></div>
+        <p class="empty-chart" id="empty-chart" hidden>这段时间暂无流量记录</p>
+      </div>
+      <div class="plot-footer">
+        <span id="trend-range"></span><span>按日统计 · UTC</span>
+      </div>
+      <span class="sr-only" aria-live="polite" id="chart-reading"></span>
+    </section>
+
+    <section class="panel details" aria-labelledby="details-heading">
+      <div class="panel-head">
+        <div class="title-inline"><h2 id="details-heading">每日明细</h2><span id="record-count" class="muted"></span></div>
+        <button type="button" id="export" class="outline-button"><svg class="icon"><use href="#i-download"/></svg>导出 CSV</button>
+      </div>
+      <div class="table-scroll" role="region" aria-label="每日流量数据，可横向滚动" tabindex="0">
+        <table>
+          <thead><tr><th scope="col">日期</th><th scope="col">克隆次数</th><th scope="col">独立克隆者</th><th scope="col">浏览次数</th><th scope="col">独立访客</th></tr></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span id="table-range"></span>
+        <div class="pager"><button class="icon-button" type="button" id="previous" aria-label="上一页" title="上一页"><svg class="icon"><use href="#i-prev"/></svg></button><span id="page-count"></span><button class="icon-button" type="button" id="next" aria-label="下一页" title="下一页"><svg class="icon"><use href="#i-next"/></svg></button></div>
+      </div>
+    </section>
+    <footer class="page-footer"><span><svg class="icon small"><use href="#i-clock"/></svg><span id="updated"></span></span><a href="https://docs.github.com/zh/rest/metrics/traffic">GitHub 统计说明 <svg class="icon small"><use href="#i-arrow"/></svg></a></footer>
+  </main>
+  <script id="traffic-data" type="application/json">{"version":1,"repository":"Stonewuu/ai-fusion-video","days":[{"date":"2026-11-05","clones":{"count":309,"uniques":127},"views":{"count":291,"uniques":145}},{"date":"2026-11-06","clones":{"count":245,"uniques":79},"views":{"count":274,"uniques":164}},{"date":"2026-11-07","clones":{"count":228,"uniques":122},"views":{"count":101,"uniques":71}},{"date":"2026-11-08","clones":{"count":169,"uniques":104},"views":{"count":121,"uniques":69}},{"date":"2026-11-09","clones":{"count":340,"uniques":97},"views":{"count":158,"uniques":100}},{"date":"2026-11-10","clones":{"count":887,"uniques":61},"views":{"count":214,"uniques":116}},{"date":"2026-11-11","clones":{"count":1282,"uniques":157},"views":{"count":171,"uniques":99}},{"date":"2026-11-12","clones":{"count":312,"uniques":94},"views":{"count":181,"uniques":101}},{"date":"2026-11-13","clones":{"count":124,"uniques":95},"views":{"count":196,"uniques":96}},{"date":"2026-11-14","clones":{"count":421,"uniques":92},"views":{"count":120,"uniques":72}},{"date":"2026-11-15","clones":{"count":166,"uniques":90},"views":{"count":124,"uniques":71}},{"date":"2026-11-16","clones":{"count":119,"uniques":88},"views":{"count":258,"uniques":148}},{"date":"2026-11-17","clones":{"count":94,"uniques":62},"views":{"count":191,"uniques":111}},{"date":"2026-11-18","clones":{"count":2940,"uniques":95},"views":{"count":189,"uniques":100}}],"snapshots":[{"observedOn":"2026-11-20","clones":{"count":7636,"uniques":1006,"first":"2026-11-05","last":"2026-11-18"},"views":{"count":2589,"uniques":1242,"first":"2026-11-05","last":"2026-11-18"}}]}</script>
+  <script type="module">
+const dayMs = 86400000;
+const number = new Intl.NumberFormat("zh-CN");
+const fullDate = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+const unitNames = {
+  count: { clones: "克隆次数", views: "浏览次数" },
+  uniques: { clones: "独立克隆者", views: "独立访客" }
+};
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const dateTime = day => Date.parse(day + "T00:00:00Z");
+const isoDay = time => new Date(time).toISOString().slice(0, 10);
+const dateLabel = day => fullDate.format(dateTime(day));
+const formatValue = value => value == null ? "—" : number.format(value);
+
+function segments(points) {
+  const groups = [];
+  let group = [];
+  for (const point of points) {
+    if (point === null) {
+      if (group.length) {
+        groups.push(group);
+        group = [];
+      }
+    } else {
+      group.push(point);
+    }
+  }
+  if (group.length) {
+    groups.push(group);
+  }
+  return groups;
+}
+
+function linePath(points) {
+  const slopes = points.slice(1).map(([x, y], i) => (y - points[i][1]) / (x - points[i][0]));
+  const tangents = points.map((_, i) => {
+    if (i === 0 || i === points.length - 1) {
+      return slopes[i === 0 ? 0 : i - 1];
+    }
+    const a = slopes[i - 1];
+    const b = slopes[i];
+    return a * b <= 0 ? 0 : 2 * a * b / (a + b);
+  });
+  let path = "M" + points[0].join(" ");
+  for (let i = 1; i < points.length; i++) {
+    const [x0, y0] = points[i - 1];
+    const [x1, y1] = points[i];
+    const width = (x1 - x0) / 3;
+    path += "C" + [x0 + width, y0 + width * tangents[i - 1], x1 - width, y1 - width * tangents[i], x1, y1].join(" ");
+  }
+  return path;
+}
+
+function yScale(max) {
+  const target = Math.max(1, max / 4);
+  const base = 10 ** Math.floor(Math.log10(target));
+  const step = [1, 2, 2.5, 5, 10].map(n => n * base).find(n => n >= target && Number.isInteger(n));
+  const ceiling = Math.max(step, Math.ceil(max / step) * step);
+  return { ceiling, step };
+}
+
+function svgNode(tag, attrs, content = "") {
+  const attributes = Object.entries(attrs).map(([key, value]) => key + '="' + value + '"').join(" ");
+  return "<" + tag + " " + attributes + ">" + content + "</" + tag + ">";
+}
+
+class TrafficChart {
+  constructor(svg, tip, reading) {
+    this.svg = svg;
+    this.tip = tip;
+    this.reading = reading;
+    this.index = -1;
+    this.resize = new ResizeObserver(() => {
+      const bounds = svg.getBoundingClientRect();
+      if (bounds.width !== this.width || bounds.height !== this.height) {
+        this.draw(false);
+      }
+    });
+    this.resize.observe(svg);
+    const pointAt = event => {
+      if (!this.rows.length) {
+        return;
+      }
+      const offset = event.clientX - svg.getBoundingClientRect().left;
+      const fraction = (offset - this.left) / (this.right - this.left);
+      this.show(Math.round(Math.min(1, Math.max(0, fraction)) * (this.rows.length - 1)), false);
+    };
+    svg.addEventListener("pointermove", pointAt);
+    svg.addEventListener("pointerdown", pointAt);
+    svg.addEventListener("pointerleave", event => {
+      if (event.pointerType === "mouse") {
+        this.clear();
+      }
+    });
+    svg.addEventListener("focus", () => {
+      if (this.rows.length) {
+        this.show(this.rows.length - 1, true);
+      }
+    });
+    svg.addEventListener("blur", () => this.clear());
+    svg.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        this.clear();
+        return;
+      }
+      if (!this.rows.length) {
+        return;
+      }
+      const positions = { ArrowLeft: Math.max(0, this.index - 1), ArrowRight: Math.min(this.rows.length - 1, this.index + 1), Home: 0, End: this.rows.length - 1 };
+      if (Object.hasOwn(positions, event.key)) {
+        event.preventDefault();
+        this.show(positions[event.key], true);
+      }
+    });
+  }
+
+  set(rows, unit, series) {
+    this.rows = rows;
+    this.unit = unit;
+    this.series = series;
+    this.draw(true);
+  }
+
+  x(index) {
+    if (this.rows.length === 1) {
+      return (this.left + this.right) / 2;
+    }
+    return this.left + index * (this.right - this.left) / (this.rows.length - 1);
+  }
+
+  y(value) {
+    return this.bottom - (this.bottom - this.top) * value / this.ceiling;
+  }
+
+  draw(animate) {
+    if (!this.rows) {
+      return;
+    }
+    this.clear();
+    const { width, height } = this.svg.getBoundingClientRect();
+    if (width < 1) {
+      return;
+    }
+    this.width = width;
+    this.height = height;
+    this.top = 17;
+    this.bottom = height - 30;
+    this.right = width - 12;
+    let max = 0;
+    let hasValues = false;
+    for (const row of this.rows) {
+      for (const key of this.series) {
+        const value = row[key]?.[this.unit];
+        if (value != null) {
+          max = Math.max(max, value);
+          hasValues = true;
+        }
+      }
+    }
+    const { ceiling, step } = yScale(max);
+    this.ceiling = ceiling;
+    this.left = Math.max(30, number.format(ceiling).length * 7 + 12);
+    this.svg.setAttribute("viewBox", [0, 0, width, height].join(" "));
+    document.querySelector("#empty-chart").hidden = hasValues;
+    if (!hasValues) {
+      this.svg.replaceChildren();
+      return;
+    }
+    const axis = [];
+    for (let value = 0; value <= ceiling; value += step) {
+      const y = this.y(value);
+      axis.push(svgNode("line", { x1: this.left, x2: this.right, y1: y, y2: y, class: value ? "grid" : "baseline" }));
+      axis.push(svgNode("text", { x: this.left - 8, y: y + 4, class: "axis", "text-anchor": "end" }, number.format(value)));
+    }
+    const size = Math.min(this.rows.length, Math.max(2, Math.floor((this.right - this.left) / 78) + 1));
+    for (let tick = 0; tick < size; tick++) {
+      const index = size === 1 ? 0 : Math.round(tick * (this.rows.length - 1) / (size - 1));
+      const day = this.rows[index].date;
+      const label = this.rows.length > 365 ? day.slice(0, 7) : day.slice(5).replace("-", "/");
+      const anchor = size === 1 ? "middle" : tick === 0 ? "start" : tick === size - 1 ? "end" : "middle";
+      axis.push(svgNode("text", { x: this.x(index), y: height - 7, class: "axis", "text-anchor": anchor }, label));
+    }
+    const shapes = [];
+    for (const key of this.series) {
+      const points = this.rows.map((row, i) => row[key] === null ? null : [this.x(i), this.y(row[key][this.unit])]);
+      for (const segment of segments(points)) {
+        if (segment.length === 1) {
+          shapes.push(svgNode("circle", { cx: segment[0][0], cy: segment[0][1], r: 3.2, fill: "var(--" + (key === "clones" ? "violet" : "green") + ")" }));
+        } else {
+          const path = linePath(segment);
+          if (key === this.series[0]) {
+            const area = path + "L" + segment.at(-1)[0] + " " + this.bottom + "L" + segment[0][0] + " " + this.bottom + "Z";
+            shapes.push(svgNode("path", { d: area, fill: "url(#area-" + key + ")" }));
+          }
+          shapes.push(svgNode("path", { d: path, class: "plot-line " + key + "-line" }));
+        }
+      }
+    }
+    const gradients = ["clones", "views"].map((key, i) => {
+      const color = "var(--" + (i ? "green" : "violet") + ")";
+      return svgNode("linearGradient", { id: "area-" + key, x1: 0, x2: 0, y1: 0, y2: 1 },
+        svgNode("stop", { offset: "0%", "stop-color": color, "stop-opacity": ".17" }) +
+        svgNode("stop", { offset: "100%", "stop-color": color, "stop-opacity": ".015" }));
+    }).join("");
+    this.svg.innerHTML = "<defs>" + gradients +
+      '<clipPath id="reveal"><rect id="reveal-rect" x="0" y="0" width="' + width + '" height="' + height + '"/></clipPath></defs>' +
+      axis.join("") + '<g clip-path="url(#reveal)">' + shapes.join("") + '</g><g id="markers" aria-hidden="true"></g>';
+    if (animate && !reducedMotion.matches) {
+      this.svg.querySelector("#reveal-rect").animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 340, easing: "cubic-bezier(.2,.65,.35,1)" });
+    }
+  }
+
+  show(index, announce) {
+    const markers = this.svg.querySelector("#markers");
+    if (!markers) {
+      return;
+    }
+    this.index = index;
+    const row = this.rows[index];
+    const x = this.x(index);
+    const entries = this.series.map(key => ({ key, label: unitNames[this.unit][key], value: row[key]?.[this.unit] }));
+    this.tip.innerHTML = "<strong>" + dateLabel(row.date) + "</strong>" + entries.map(({ key, label, value }) =>
+      '<div class="tip-row"><span><i class="' + key + '"></i>' + label + "</span><b>" + formatValue(value) + "</b></div>"
+    ).join("");
+    markers.innerHTML = svgNode("line", { x1: x, x2: x, y1: this.top, y2: this.bottom, class: "guide" }) +
+      entries.filter(entry => entry.value != null).map(({ key, value }) =>
+        svgNode("circle", { cx: x, cy: this.y(value), r: 4.5, class: "dot", fill: "var(--" + (key === "clones" ? "violet" : "green") + ")" })
+      ).join("");
+    this.tip.hidden = false;
+    const w = this.tip.offsetWidth;
+    this.tip.style.left = Math.max(0, Math.min(this.width - w, x + w + 14 < this.width ? x + 12 : x - w - 12)) + "px";
+    this.tip.style.top = this.top + 3 + "px";
+    if (announce) {
+      this.reading.textContent = dateLabel(row.date) + "，" + entries.map(v => v.label + " " + formatValue(v.value)).join("，");
+    }
+  }
+
+  clear() {
+    this.index = -1;
+    this.tip.hidden = true;
+    this.svg.querySelector("#markers")?.replaceChildren();
+  }
+}
+
+const $ = selector => document.querySelector(selector);
+const history = JSON.parse($("#traffic-data").textContent);
+const snapshot = history.snapshots.at(-1);
+const byDay = new Map(history.days.map(row => [row.date, row]));
+const keys = ["clones", "views"];
+const dimensions = [["clones", "count"], ["clones", "uniques"], ["views", "count"], ["views", "uniques"]];
+const earliest = history.days.at(0)?.date;
+const latest = history.days.at(-1)?.date;
+const perPage = 7;
+const controls = { range: "14", unit: "count", active: new Set(keys), page: 0, customStart: earliest, customEnd: latest };
+const chart = new TrafficChart($("#plot"), $("#tooltip"), $("#chart-reading"));
+let periodRows = [];
+let recordedRows = [];
+
+function eachDay(start, end) {
+  const rows = [];
+  for (let time = dateTime(start); time <= dateTime(end); time += dayMs) {
+    const date = isoDay(time);
+    rows.push(byDay.get(date) ?? { date, clones: null, views: null });
+  }
+  return rows;
+}
+
+function shortRange(start, end) {
+  if (start === end) {
+    return dateLabel(start);
+  }
+  let last = dateLabel(end);
+  if (start.slice(0, 7) === end.slice(0, 7)) {
+    last = Number(end.slice(8)) + "日";
+  } else if (start.slice(0, 4) === end.slice(0, 4)) {
+    last = last.slice(last.indexOf("年") + 1);
+  }
+  return dateLabel(start) + " – " + last;
+}
+
+function sparkline(rows, key, unit) {
+  const values = rows.map(row => row[key]?.[unit] ?? null);
+  const observed = values.filter(v => v !== null);
+  if (!observed.length) {
+    return "";
+  }
+  const min = Math.min(...observed);
+  const max = Math.max(...observed);
+  const points = values.map((v, i) => {
+    if (v === null) {
+      return null;
+    }
+    return [values.length === 1 ? 34 : 2 + 66 * i / (values.length - 1), max === min ? 13 : 23 - (v - min) / (max - min) * 20];
+  });
+  const color = key === "clones" ? "#bbadff" : "#7ddfcb";
+  const paths = segments(points).map(group => {
+    if (group.length === 1) {
+      return svgNode("circle", { cx: group[0][0], cy: group[0][1], r: 2, fill: color });
+    }
+    return svgNode("path", { d: linePath(group), fill: "none", stroke: color, "stroke-width": 1.8, "stroke-linecap": "round" });
+  });
+  return '<svg class="spark" viewBox="0 0 70 26" aria-hidden="true">' + paths.join("") + "</svg>";
+}
+
+function overview() {
+  const [owner, repo] = history.repository.split("/");
+  $("#repo-owner").textContent = owner;
+  $("#repo-name").textContent = repo;
+  $("#repo-link").href = "https://github.com/" + history.repository;
+  $("#archive-link").href = $("#repo-link").href + "/tree/traffic-history";
+  document.title = "仓库流量 · " + repo;
+  const dates = keys.flatMap(key => [snapshot[key].first, snapshot[key].last]).filter(Boolean).sort();
+  $("#summary-range").textContent = dates.length ? shortRange(dates[0], dates.at(-1)) + " · UTC" : "采集于 " + dateLabel(snapshot.observedOn) + " · UTC";
+  $("#metrics").innerHTML = dimensions.map(([key, unit]) => {
+    const data = snapshot[key];
+    const rows = data.first === null ? [] : eachDay(data.first, data.last);
+    return '<div class="kpi"><div class="kpi-label">' + unitNames[unit][key] +
+      '</div><div class="kpi-value-row"><strong class="kpi-value">' + formatValue(data[unit]) +
+      "</strong>" + sparkline(rows, key, unit) + "</div></div>";
+  }).join("");
+  $("#updated").textContent = "采集于 " + dateLabel(snapshot.observedOn) + " UTC";
+}
+
+function renderLegend() {
+  const container = $("#legend");
+  const isCount = controls.unit === "count";
+  $("#legend-basis").textContent = isCount ? "区间合计" : "单日最高";
+  for (const key of keys) {
+    let button = container.querySelector('[data-series="' + key + '"]');
+    if (!button) {
+      button = document.createElement("button");
+      button.type = "button";
+      button.className = "series-key";
+      button.dataset.series = key;
+      container.append(button);
+    }
+    const active = controls.active.has(key);
+    const label = unitNames[controls.unit][key];
+    button.setAttribute("aria-pressed", String(active));
+    button.setAttribute("aria-disabled", String(active && controls.active.size === 1));
+    button.title = active && controls.active.size === 1 ? "至少显示一项指标" : (active ? "隐藏" : "显示") + label;
+    let total = null;
+    for (const row of periodRows) {
+      if (row[key] !== null) {
+        const value = row[key][controls.unit];
+        total = isCount ? (total ?? 0) + value : Math.max(total ?? 0, value);
+      }
+    }
+    button.innerHTML = '<i class="swatch ' + key + '" aria-hidden="true"></i>' + label + " <b>" + formatValue(total) + "</b>";
+  }
+}
+
+function renderChart() {
+  renderLegend();
+  chart.set(periodRows, controls.unit, keys.filter(key => controls.active.has(key)));
+  for (const button of $("#units").querySelectorAll("button")) {
+    button.setAttribute("aria-pressed", String(controls.unit === button.dataset.unit));
+  }
+}
+
+function renderTable() {
+  const count = recordedRows.length;
+  const pages = Math.max(1, Math.ceil(count / perPage));
+  const start = controls.page * perPage;
+  const pageRows = recordedRows.slice(start, start + perPage);
+  $("#table-body").innerHTML = pageRows.length ? pageRows.map(row =>
+    '<tr><th scope="row" class="table-date">' + row.date + "</th>" +
+    dimensions.map(([key, unit]) => "<td>" + formatValue(row[key]?.[unit]) + "</td>").join("") + "</tr>"
+  ).join("") : '<tr><td colspan="5">这段时间暂无记录</td></tr>';
+  $("#record-count").textContent = count + " 天";
+  $("#table-range").textContent = count ? "第 " + (start + 1) + "–" + (start + pageRows.length) + " 条，共 " + count + " 条" : "0 条记录";
+  $("#page-count").textContent = (controls.page + 1) + " / " + pages;
+  $("#previous").disabled = controls.page === 0;
+  $("#next").disabled = controls.page === pages - 1;
+  $("#export").disabled = !count;
+}
+
+function refreshRange() {
+  let start = earliest;
+  let end = latest;
+  if (earliest && controls.range === "custom") {
+    start = controls.customStart;
+    end = controls.customEnd;
+  } else if (earliest && controls.range !== "all") {
+    start = isoDay(Math.max(dateTime(earliest), dateTime(latest) - (Number(controls.range) - 1) * dayMs));
+  }
+  periodRows = start ? eachDay(start, end) : [];
+  recordedRows = periodRows.filter(row => row.clones !== null || row.views !== null).reverse();
+  $("#trend-range").textContent = start ? shortRange(start, end) : "暂无归档";
+  for (const button of $("#ranges").querySelectorAll("button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.range === controls.range));
+  }
+  controls.page = 0;
+  renderChart();
+  renderTable();
+}
+
+function closeCalendar() {
+  $("#custom-range").hidden = true;
+  $('#ranges [data-range="custom"]').setAttribute("aria-expanded", "false");
+}
+
+$("#ranges").addEventListener("click", event => {
+  const button = event.target.closest("button");
+  if (!button) {
+    return;
+  }
+  if (button.dataset.range === "custom") {
+    const form = $("#custom-range");
+    form.hidden = !form.hidden;
+    button.setAttribute("aria-expanded", String(!form.hidden));
+    if (!form.hidden) {
+      $("#from-date").focus();
+    }
+    return;
+  }
+  closeCalendar();
+  controls.range = button.dataset.range;
+  refreshRange();
+});
+
+$("#custom-range").addEventListener("submit", event => {
+  event.preventDefault();
+  const from = $("#from-date").value;
+  const to = $("#to-date").value;
+  if (from > to) {
+    $("#to-date").setCustomValidity("结束日期须等于或晚于开始日期");
+    $("#to-date").reportValidity();
+    return;
+  }
+  controls.customStart = from;
+  controls.customEnd = to;
+  controls.range = "custom";
+  closeCalendar();
+  $('#ranges [data-range="custom"]').focus();
+  refreshRange();
+});
+$("#custom-range").addEventListener("input", () => $("#to-date").setCustomValidity(""));
+$("#custom-range").addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    closeCalendar();
+    $('#ranges [data-range="custom"]').focus();
+  }
+});
+
+$("#units").addEventListener("click", event => {
+  const button = event.target.closest("button");
+  if (button && button.dataset.unit !== controls.unit) {
+    controls.unit = button.dataset.unit;
+    renderChart();
+  }
+});
+$("#legend").addEventListener("click", event => {
+  const key = event.target.closest("button")?.dataset.series;
+  if (!key || (controls.active.has(key) && controls.active.size === 1)) {
+    return;
+  }
+  if (controls.active.has(key)) {
+    controls.active.delete(key);
+  } else {
+    controls.active.add(key);
+  }
+  renderChart();
+});
+
+$("#previous").addEventListener("click", () => {
+  controls.page--;
+  renderTable();
+});
+$("#next").addEventListener("click", () => {
+  controls.page++;
+  renderTable();
+});
+$("#export").addEventListener("click", () => {
+  const lines = [["日期（UTC）", ...dimensions.map(([key, unit]) => unitNames[unit][key])].join(",")];
+  for (const row of [...recordedRows].reverse()) {
+    lines.push([row.date, ...dimensions.map(([key, unit]) => row[key]?.[unit] ?? "")].join(","));
+  }
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = history.repository.split("/")[1] + "-traffic-" + periodRows[0].date + "_" + periodRows.at(-1).date + ".csv";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+$("#theme").addEventListener("click", () => {
+  const isDark = getComputedStyle(document.documentElement).colorScheme === "dark";
+  document.documentElement.dataset.theme = isDark ? "light" : "dark";
+});
+
+overview();
+const calendarButton = $('#ranges [data-range="custom"]');
+calendarButton.disabled = !earliest;
+if (earliest) {
+  for (const input of [$("#from-date"), $("#to-date")]) {
+    input.min = earliest;
+    input.max = latest;
+  }
+  $("#from-date").value = earliest;
+  $("#to-date").value = latest;
+}
+refreshRange();
+
+</script>
+</body>
+</html>
