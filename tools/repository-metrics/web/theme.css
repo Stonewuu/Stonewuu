@@ -14,6 +14,7 @@
 :root.dark { --canvas:#14151d;--paper:#20212e;--ink:#f1f1fa;--sub:#aeb2c9;--hair:#353749;--mist:#2b2c3d;--accent:#a79af7;--accent-foreground:#201e31;--focus:#bab0ff;
   --overlay:#292a39;--field-background:#2a2b39;--chart-violet:#ae9bff;--chart-orchid:#e19ae6;--chart-teal:#69d8c2;--chart-blue:#86c3f5;--chart-amber:#edb876;--chart-rose:#efa0bd;--chart-olive:#c2ce7d;--tip:#e7e7f5;--tip-ink:#29293d;color-scheme:dark;}
 body {margin:0;background:var(--canvas);color:var(--ink);min-width:280px;}
+html,.picker-scroll,.consumer-menu,.metric-popover,.calendar-popover,.table__scroll-container,.sheet-dialog {scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--sub) 36%,transparent) transparent;}
 .wrap {width:min(1180px,calc(100% - 80px));margin-inline:auto;}
 .mast {border-bottom:1px solid var(--hair);background:var(--paper);}
 .mast-inner,.mast-actions,.profile-link,.archive-link,.section-heading,.heading-label,.date-tools,.plot-tools,.plot-tools>div,.plot-footer,.popover-footer,.calendar-actions,.page-end,.page-end>a {display:flex;align-items:center;}

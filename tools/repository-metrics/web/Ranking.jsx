@@ -1,16 +1,14 @@
-import React, { useId, useState } from "react";
+import React, { useState } from "react";
 import { ListBox } from "@heroui/react";
 import { Blank } from "./controls.jsx";
 import { numeric } from "../model.mjs";
 
 const colors=["#7264d7","#43aa97","#ecaa65","#65a0d4","#c780b2","#80975e","#a99cdb","#62b7c4","#cd987e","#9ba1b4"];
 function Distribution({entries,total,active,onHover,onPin,kind}) {
-  const id=useId();
   const chosen=active==null?null:entries[active];
   let offset=0;
   return <div className="rank-visual">
-    <div className="rank-donut"><svg viewBox="0 0 180 180" role="img" aria-labelledby={id}>
-      <title id={id}>{kind}浏览分布。上榜浏览次数合计 {numeric.format(total)}。</title>
+    <div className="rank-donut"><svg viewBox="0 0 180 180" role="img" aria-label={kind+"浏览分布，上榜浏览次数合计 "+numeric.format(total)}>
       <circle cx="90" cy="90" r="72" fill="none" stroke="var(--mist)" strokeWidth="15"/>
       {entries.map((entry,i)=>{
         const share=total?entry.count/total*100:0, start=offset;
