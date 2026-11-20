@@ -27,7 +27,7 @@ function parseResponse(output) {
   if (status === 202) {
     throw new SourceError("pending", status);
   }
-  return { body: raw ? JSON.parse(raw) : null, next: /^link:.*?<([^>]+)>;\s*rel="next"/im.exec(headers)?.[1] };
+  return { status, body: raw ? JSON.parse(raw) : null, next: /^link:.*?<([^>]+)>;\s*rel="next"/im.exec(headers)?.[1] };
 }
 
 export async function api(endpoint, { token, fields, statistics = false } = {}) {
@@ -68,7 +68,7 @@ export async function allPages(endpoint, prop) {
   let next = endpoint;
   while (next) {
     const page = await api(next);
-    const rows = prop ? page.body[prop] : page.body;
+    const rows = page.status === 204 ? [] : prop ? page.body[prop] : page.body;
     if (!Array.isArray(rows)) {
       throw new SourceError("invalid");
     }

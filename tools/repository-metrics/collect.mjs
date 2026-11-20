@@ -1,8 +1,9 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { mergeTraffic, newArchive } from "./archive.mjs";
 import { publicSources, trafficSources } from "./sources.mjs";
+import { publicSourceName } from "./referrers.mjs";
 
 const [scope, output, sourceDir] = process.argv.slice(2);
 if (!["public", "traffic", "import-traffic"].includes(scope) || !output || (scope === "import-traffic" && !sourceDir)) {
@@ -41,7 +42,8 @@ function ranks(rows, label) {
     throw new Error("GitHub 流量排行数据无效。");
   }
   return rows.map(row => ({
-    name: row[label], ...(label === "path" ? { title: row.title ?? "" } : {}), count: row.count, uniques: row.uniques
+    name: label === "referrer" ? publicSourceName(row[label]) : row[label],
+    ...(label === "path" ? { title: row.title ?? "" } : {}), count: row.count, uniques: row.uniques
   }));
 }
 
@@ -56,7 +58,15 @@ async function collect(repository) {
     throw new Error("已有快照与采集日期或仓库不匹配。");
   }
   if (scope === "public") {
-    const sources = await publicSources(repository);
+    let pastJobs=observation.sources.jobPerformance?.data;
+    if (!pastJobs) {
+      const earlier=(await readdir(folder)).filter(name=>/^\d{4}-\d{2}-\d{2}\.json$/.test(name) && name<observedOn+".json").sort().at(-1);
+      if (earlier) {
+        const last=await readOptional(path.join(folder,earlier));
+        pastJobs=last?.sources.jobPerformance?.data;
+      }
+    }
+    const sources = await publicSources(repository, pastJobs);
     for (const [name, value] of Object.entries(sources)) {
       const old = observation.sources[name];
       observation.sources[name] = old?.status === "ready" && value.status !== "ready" ? { ...old, lastAttempt: value.status } : value;

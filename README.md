@@ -4,6 +4,8 @@
 
 <p>AI Agent Developer &nbsp;·&nbsp; Open Source Builder &nbsp;·&nbsp; <a href="https://www.stonewu.com">stonewu.com</a></p>
 
+<p><a href="https://stonewuu.github.io/Stonewuu/traffic/">仓库统计 · Repository metrics</a></p>
+
 <a href="https://www.stonewu.com">
   <img src="https://img.shields.io/badge/Blog-stonewu.com-f6f8fa?style=flat-square&logo=ghost&logoColor=0969da" />
 </a>

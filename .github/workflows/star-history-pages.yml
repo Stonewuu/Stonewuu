@@ -6,7 +6,12 @@ on:
       - master
     paths:
       - "public/**"
+      - "tools/repository-metrics/**"
       - ".github/workflows/star-history-pages.yml"
+  workflow_run:
+    workflows: ["采集仓库统计"]
+    types: [completed]
+    branches: [master]
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
@@ -22,6 +27,7 @@ concurrency:
 
 jobs:
   generate-and-deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
@@ -49,6 +55,18 @@ jobs:
 
       - name: Copy static pages and media
         run: cp -R public/. _site/
+
+      - name: 读取仓库统计归档
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: traffic-history
+          path: .metrics-archive
+          persist-credentials: false
+
+      - name: 生成独立的仓库统计页
+        run: |
+          node --test tools/repository-metrics/*.test.mjs
+          node tools/repository-metrics/build.mjs .metrics-archive _site
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

@@ -39,8 +39,7 @@ async function releaseStats(base) {
   });
 }
 
-async function actionsStats(base) {
-  const runs = await allPages(base + "/actions/runs?per_page=100", "workflow_runs");
+async function actionsStats(base, runs) {
   const workflows = await allPages(base + "/actions/workflows?per_page=100", "workflows");
   const days = {};
   for (const run of runs) {
@@ -50,6 +49,48 @@ async function actionsStats(base) {
     row[status] = (row[status] ?? 0) + 1;
   }
   return { days, runs: runs.length, states: tally(workflows, "state"), workflows: workflows.length };
+}
+
+async function jobPerformance(base, runs, previous = {}) {
+  const cached = previous.completed ?? {};
+  const completed = {};
+  const days = {};
+  await inBatches(runs, 3, async run => {
+    const key = run.id + "-" + run.run_attempt;
+    let totals = cached[key];
+    if (!totals) {
+      const jobs = await allPages(base + "/actions/runs/" + run.id + "/jobs?filter=all&per_page=100", "jobs");
+      totals = {};
+      for (const job of jobs) {
+        const date = (job.started_at ?? job.created_at ?? run.created_at).slice(0, 10);
+        const row = totals[date] ??= { jobs: 0, doneJobs: 0, passJobs: 0, failJobs: 0, seconds: 0, wait: 0, timed: 0, waited: 0 };
+        row.jobs++;
+        if (job.status === "completed") {
+          row.doneJobs++;
+          row.passJobs += Number(job.conclusion === "success");
+          row.failJobs += Number(job.conclusion === "failure");
+        }
+        if (job.started_at && job.completed_at) {
+          row.seconds += Math.max(0, (Date.parse(job.completed_at) - Date.parse(job.started_at)) / 1000);
+          row.timed++;
+        }
+        if (job.created_at && job.started_at) {
+          row.wait += Math.max(0, (Date.parse(job.started_at) - Date.parse(job.created_at)) / 1000);
+          row.waited++;
+        }
+      }
+    }
+    if (run.status === "completed") {
+      completed[key] = totals;
+    }
+    for (const [date, stats] of Object.entries(totals)) {
+      const day = days[date] ??= {};
+      for (const [field,count] of Object.entries(stats)) {
+        day[field] = (day[field] ?? 0) + count;
+      }
+    }
+  });
+  return { days, completed };
 }
 
 async function lifecycle(base) {
@@ -89,7 +130,7 @@ async function withStatus(run) {
   }
 }
 
-export async function publicSources(repository) {
+export async function publicSources(repository, previousJobs) {
   const base = "repos/" + repository;
   const { body: repo } = await api(base);
   if (repo.private || repo.full_name.toLowerCase() !== repository.toLowerCase()) {
@@ -97,6 +138,8 @@ export async function publicSources(repository) {
   }
   const get = async endpoint => (await api(base + "/" + endpoint)).body;
   const statistic = async name => (await api(base + "/stats/" + name, { statistics: true })).body;
+  let runs;
+  const workflowRuns = () => runs ??= allPages(base + "/actions/runs?per_page=100", "workflow_runs");
   const jobs = {
     repository: async () => ({
       stars: repo.stargazers_count, forks: repo.forks_count, watchers: repo.subscribers_count,
@@ -118,12 +161,18 @@ export async function publicSources(repository) {
       return body.data.repository.discussions.totalCount;
     },
     languages: () => get("languages"),
+    starHistory: () => allPages(base + "/stargazers/history?per_page=30"),
+    forkHistory: async () => {
+      const forks = await allPages(base + "/forks?per_page=100");
+      return tally(forks.map(fork => ({ day: fork.created_at.slice(0, 10) })), "day");
+    },
     community: async () => {
       const profile = await get("community/profile");
       return { health: profile.health_percentage, files: Object.fromEntries(Object.entries(profile.files).map(([k, v]) => [k, v !== null])) };
     },
     releases: () => releaseStats(base),
-    actions: () => actionsStats(base),
+    actions: async () => actionsStats(base, await workflowRuns()),
+    jobPerformance: async () => jobPerformance(base, await workflowRuns(), previousJobs),
     lifecycle: () => lifecycle(base),
     contributorCount: async () => (await allPages(base + "/contributors?anon=true&per_page=100")).length,
     actionsCache: async () => {
