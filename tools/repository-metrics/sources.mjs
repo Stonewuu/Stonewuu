@@ -125,12 +125,13 @@ async function lifecycle(base, issueList) {
   return days;
 }
 
-async function withStatus(run) {
+async function withStatus(name, run) {
   try {
     return { status: "ready", data: await run() };
   } catch (error) {
     if (!(error instanceof SourceError)) {
-      throw error;
+      console.error(name + " · 解析 GitHub 返回的数据时发生错误：" + error.name);
+      return { status: "error" };
     }
     return { status: error.status, httpStatus: error.httpStatus };
   }
@@ -204,7 +205,7 @@ export async function publicSources(repository, previousJobs) {
     })),
     ...extraSources(repository, repo, issueRows)
   };
-  return Object.fromEntries(await inBatches(Object.entries(jobs), 4, async ([key, run]) => [key, await withStatus(run)]));
+  return Object.fromEntries(await inBatches(Object.entries(jobs), 4, async ([key, run]) => [key, await withStatus(key,run)]));
 }
 
 export async function trafficSources(repository, token) {

@@ -46,6 +46,10 @@ export function participationSummary(items) {
   const byReaction = Object.fromEntries(reactions.map(k => [k, { issue: 0, pr: 0 }]));
   const labels = new Map();
   for (const item of items) {
+    if (!Number.isSafeInteger(item.comments) || !Number.isSafeInteger(item.reactions?.total_count) ||
+        reactions.some(emoji=>!Number.isSafeInteger(item.reactions[emoji]))) {
+      throw new SourceError("invalid");
+    }
     const kind = item.pull_request ? "pr" : "issue";
     values[kind + "Comments"] += item.comments;
     values[kind + "Reactions"] += item.reactions.total_count;
@@ -169,6 +173,9 @@ export function summarizeBill(document) {
 
 async function dependencyBill(base) {
   const { body } = await api(base + "/dependency-graph/sbom/generate-report");
+  if (typeof body?.sbom_url !== "string") {
+    throw new SourceError("invalid");
+  }
   const url = new URL(body.sbom_url);
   const prefix = "/" + base.toLowerCase() + "/dependency-graph/sbom/fetch-report/";
   if (url.origin !== "https://api.github.com" || !url.pathname.toLowerCase().startsWith(prefix)) {
@@ -227,6 +234,9 @@ async function fileInventory(base, branch) {
     }
     if (entry.type!=="blob") {
       continue;
+    }
+    if (!Number.isSafeInteger(entry.size) || entry.size<0) {
+      throw new SourceError("invalid");
     }
     values.trackedFiles++;
     values.trackedBytes += entry.size;

@@ -42,6 +42,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/repository-metrics/package-lock.json
 
       - name: Generate repository star histories
         env:
@@ -65,6 +67,7 @@ jobs:
 
       - name: 生成独立的仓库统计页
         run: |
+          npm ci --prefix tools/repository-metrics --no-audit --no-fund
           node --test tools/repository-metrics/*.test.mjs
           node tools/repository-metrics/build.mjs .metrics-archive _site
 

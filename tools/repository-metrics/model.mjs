@@ -1,4 +1,6 @@
-const GROUPS = ["仓库流量", "关注与项目", "议题与协作", "代码与贡献", "发布与自动化"];
+import { extraEntries, ratios } from "./more-metrics.mjs";
+
+const GROUPS = ["仓库流量", "关注与项目", "议题与协作", "代码与贡献", "发布与自动化", "社区与依赖"];
 const entries = [
   ["clones","克隆次数",0,"次","sum"],["views","浏览次数",0,"次","sum"],
   ["cloners","独立克隆者",0,"人","peak"],["visitors","独立访客",0,"人","peak"],
@@ -25,24 +27,24 @@ const entries = [
   ["failJobs","失败任务",4,"个","sum"],["jobSeconds","任务运行总时长",4,"秒","sum"],["queueSeconds","任务等待总时长",4,"秒","sum"],
   ["jobSuccessRate","任务成功率",4,"%","rate"]
 ];
-export const metrics = Object.fromEntries(entries.map(([id,label,group,unit,rule = "last"]) => [id,{id,label,group:GROUPS[group],unit,rule}]));
+export const metrics = Object.fromEntries([...entries,...extraEntries].map(([id,label,group,unit,rule = "last"]) => [id,{id,label,group:GROUPS[group],unit,rule}]));
 export const metricGroups = GROUPS;
 export const dayMs = 86400000;
 export const dayTime = str => Date.parse(str + "T00:00:00Z");
 export const isoDay = value => new Date(value).toISOString().slice(0,10);
 export const validDate = str => typeof str === "string" && /^\d{4}-\d{2}-\d{2}$/.test(str) && Number.isFinite(dayTime(str)) && isoDay(dayTime(str)) === str;
-export const rules = {sum:"合计",peak:"单日最高",last:"末次观测",rate:"按完成数加权"};
+export const rules = {sum:"合计",peak:"单日最高",last:"末次观测",rate:"按完成数加权",weighted:"按样本数加权"};
 export const numeric = new Intl.NumberFormat("zh-CN",{maximumFractionDigits:2});
 export function display(value, unit, compact = false) {
   if (value == null) {
     return "—";
   }
-  if (unit === "秒") {
-    return numeric.format(value) + " 秒";
+  if (unit === "秒" || unit === "小时") {
+    return numeric.format(value) + " " + unit;
   }
   if (unit === "字节" || unit === "KiB") {
     const bytes = unit === "KiB" ? value * 1024 : value;
-    const scale = bytes === 0 ? 0 : Math.min(4, Math.max(0, Math.floor(Math.log(bytes)/Math.log(1024))));
+    const scale = bytes === 0 ? 0 : Math.min(4, Math.max(0, Math.floor(Math.log(Math.abs(bytes))/Math.log(1024))));
     return numeric.format(bytes/1024**scale) + " " + ["B","KiB","MiB","GiB","TiB"][scale];
   }
   if (compact && Math.abs(value) >= 10000) {
@@ -104,34 +106,35 @@ export function buckets(repositories, selected, start, end, grain) {
   const series = [];
   for (const id of selected) {
     const metric = metrics[id];
+    const ratio = ratios[id];
     for (const repo of repositories) {
       const values = [];
       let total = null;
       let observed = 0;
       let lastDay = null;
-      let allPassed = 0, allDone = 0;
+      let totalNumerator = 0, totalDenominator = 0;
       for (const window of windows) {
         let value = null;
-        let passed = 0, done = 0;
+        let numerator = 0, denominator = 0;
         for (const day of window) {
           const current = repo.days[day]?.[id];
           if (current != null) {
             observed++;
             lastDay = day;
-            if (metric.rule === "rate") {
-              passed += repo.days[day].passJobs;
-              done += repo.days[day].doneJobs;
+            if (ratio) {
+              numerator += repo.days[day][ratio[0]];
+              denominator += repo.days[day][ratio[1]];
             } else {
               total = combine(total,current,metric.rule);
               value = combine(value,current,metric.rule);
             }
           }
         }
-        if (metric.rule === "rate" && done) {
-          allPassed += passed;
-          allDone += done;
-          value = 100*passed/done;
-          total = 100*allPassed/allDone;
+        if (ratio && denominator) {
+          totalNumerator += numerator;
+          totalDenominator += denominator;
+          value = ratio[2]*numerator/denominator;
+          total = ratio[2]*totalNumerator/totalDenominator;
         }
         values.push(value);
       }

@@ -1,5 +1,6 @@
 import { isoDay, dayTime, dayMs, metrics } from "./model.mjs";
 import { validateArchive } from "./archive.mjs";
+import { additionalSourceNames, ratios } from "./more-metrics.mjs";
 
 const lifeKeys = ["issueOpened","issueClosed","prOpened","prClosed","prMerged"];
 
@@ -66,17 +67,26 @@ export function prepare(repository, history, observations, starHistory) {
       totals(date,meta);
     }
     const starWeeks = data("starHistory");
-    for (const week of starWeeks ?? []) {
+    let starTotal=0;
+    for (const week of [...(starWeeks ?? [])].sort((a,b)=>a.week-b.week)) {
       week.days.forEach((count,i)=>{
         const day=isoDay(week.week*1000+i*dayMs);
         if (day<=date && (!birth || day>=birth)) {
           value(day,"starAdds",count);
+          starTotal+=count;
+          value(day,"starHistoryTotal",starTotal);
         }
       });
     }
     const forks = data("forkHistory");
     if (forks) {
-      calendar(birth,date,d=>value(d,"forkCreated",forks[d]??0));
+      let forkTotal=0;
+      calendar(birth,date,d=>{
+        const created=forks[d]??0;
+        forkTotal+=created;
+        value(d,"forkCreated",created);
+        value(d,"forkHistoryTotal",forkTotal);
+      });
     }
     const collaboration = data("collaboration");
     if (collaboration) {
@@ -93,6 +103,8 @@ export function prepare(repository, history, observations, starHistory) {
     if (releases) {
       const assets = releases.flatMap(r=>r.assets);
       totals(date,{releases:releases.length,releaseAssets:assets.length,downloads:assets.reduce((a,b)=>a+b.downloads,0)});
+      totals(date,{stableReleases:releases.filter(r=>!r.prerelease).length,prereleases:releases.filter(r=>r.prerelease).length,
+        releaseBytes:assets.reduce((n,a)=>n+a.bytes,0),downloadedAssets:assets.filter(a=>a.downloads>0).length});
       const byDate = {};
       for (const release of releases) {
         const d=release.date.slice(0,10);
@@ -106,15 +118,21 @@ export function prepare(repository, history, observations, starHistory) {
         for (const key of lifeKeys) {
           value(d,key,lifecycle[d]?.[key]??0);
         }
+        value(d,"issueCloseSeconds",lifecycle[d]?.issueCloseSeconds);
       });
     }
     const runs = data("actions");
     if (runs) {
       value(date,"workflows",runs.workflows);
+      const active=runs.states.active??0;
+      totals(date,{activeWorkflows:active,inactiveWorkflows:runs.workflows-active});
       const first=Object.keys(runs.days).sort()[0] ?? date;
       calendar(first,date,d=>{
         const states = runs.days[d] ?? {};
         totals(d,{runs:Object.values(states).reduce((a,b)=>a+b,0),success:states.success??0,failure:states.failure??0,cancelled:states.cancelled??0});
+        const completed=["success","failure","timed_out","neutral","cancelled","skipped","stale","action_required","startup_failure"]
+          .reduce((count,outcome)=>count+(states[outcome]??0),0);
+        totals(d,{completedRuns:completed,skippedRuns:states.skipped??0,timedOutRuns:states.timed_out??0,neutralRuns:states.neutral??0});
       });
     }
     const deployments = data("deployments");
@@ -125,9 +143,10 @@ export function prepare(repository, history, observations, starHistory) {
       const first=Object.keys(performance.days).sort()[0] ?? date;
       calendar(first,date,d=>{
         const day=performance.days[d];
+        value(d,"timedJobs",day?.timed??0);
+        value(d,"waitedJobs",day?.waited??0);
         totals(d,{jobs:day?.jobs??0,doneJobs:day?.doneJobs??0,passJobs:day?.passJobs??0,failJobs:day?.failJobs??0,
-          jobSeconds:!day||day.timed?day?.seconds??0:null,queueSeconds:!day||day.waited?day?.wait??0:null,
-          jobSuccessRate:day?.doneJobs?100*day.passJobs/day.doneJobs:null});
+          jobSeconds:!day||day.timed?day?.seconds??0:null,queueSeconds:!day||day.waited?day?.wait??0:null});
       });
     }
     if (deployments) {
@@ -160,7 +179,7 @@ export function prepare(repository, history, observations, starHistory) {
     }
     const frequency = data("codeFrequency");
     for (const [t,add,del] of frequency ?? []) {
-      totals(isoDay(t*1000),{added:add,removed:Math.abs(del)});
+      totals(isoDay(t*1000),{added:add,removed:Math.abs(del),netLines:add-Math.abs(del)});
     }
     data("punchCard");
     data("contributors");
@@ -168,6 +187,43 @@ export function prepare(repository, history, observations, starHistory) {
     const paths = data("paths");
     if (referrers || paths) {
       ranks[date] = { referrers: referrers ?? null, paths: paths ?? null };
+    }
+    for (const source of Object.keys(additionalSourceNames)) {
+      const item=data(source);
+      if (!item) {
+        continue;
+      }
+      if (item.values) {
+        totals(date,item.values);
+      }
+      if (source==="activity") {
+        const first=Object.keys(item.days).sort()[0]??date;
+        calendar(first,date,day=>{
+          for (const field of ["gitEvents","pushes","forcePushes","branchCreates","branchDeletes","prMergeActivity","queueMerges"]) {
+            value(day,field,item.days[day]?.[field]??0);
+          }
+        });
+      } else if (source==="reviewMetrics") {
+        for (const [day,bucket] of Object.entries(item.days)) {
+          value(day,"mergeSeconds",bucket.mergeSeconds);
+          value(day,"mergedSamples",bucket.mergedSamples);
+        }
+      } else if (source==="reviewComments") {
+        calendar(birth,date,day=>value(day,"newInlineComments",item.days[day]??0));
+      }
+    }
+  }
+  for (const [day,fields] of Object.entries(table)) {
+    const previous=table[isoDay(dayTime(day)-dayMs)];
+    for (const [metric,change] of [["stars","starChange"],["forks","forkChange"],["watchers","watcherChange"]]) {
+      if (fields[metric]!=null && previous?.[metric]!=null) {
+        value(day,change,fields[metric]-previous[metric]);
+      }
+    }
+    for (const [id,[numerator,denominator,factor]] of Object.entries(ratios)) {
+      if (fields[denominator]>0 && fields[numerator]!=null) {
+        value(day,id,factor*fields[numerator]/fields[denominator]);
+      }
     }
   }
   return {repository, days:Object.fromEntries(Object.entries(table).sort(([a],[b])=>a.localeCompare(b))),
