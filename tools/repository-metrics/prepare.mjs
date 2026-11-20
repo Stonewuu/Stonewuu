@@ -1,6 +1,5 @@
 import { isoDay, dayTime, dayMs, metrics } from "./model.mjs";
 import { validateArchive } from "./archive.mjs";
-import { publicSourceName } from "./referrers.mjs";
 
 const lifeKeys = ["issueOpened","issueClosed","prOpened","prClosed","prMerged"];
 
@@ -165,13 +164,10 @@ export function prepare(repository, history, observations, starHistory) {
     }
     data("punchCard");
     data("contributors");
-    const names = data("referrers"), paths = data("paths");
-    const ref = names?.map(row=>({...row,name:publicSourceName(row.name)}));
-    if (ref) {
-      details.referrers.data=ref;
-    }
-    if (ref || paths) {
-      ranks[date] = {referrers:ref??null,paths:paths??null};
+    const referrers = data("referrers");
+    const paths = data("paths");
+    if (referrers || paths) {
+      ranks[date] = { referrers: referrers ?? null, paths: paths ?? null };
     }
   }
   return {repository, days:Object.fromEntries(Object.entries(table).sort(([a],[b])=>a.localeCompare(b))),

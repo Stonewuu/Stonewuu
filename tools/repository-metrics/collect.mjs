@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { mergeTraffic, newArchive } from "./archive.mjs";
 import { publicSources, trafficSources } from "./sources.mjs";
-import { publicSourceName } from "./referrers.mjs";
 
 const [scope, output, sourceDir] = process.argv.slice(2);
 if (!["public", "traffic", "import-traffic"].includes(scope) || !output || (scope === "import-traffic" && !sourceDir)) {
@@ -42,7 +41,7 @@ function ranks(rows, label) {
     throw new Error("GitHub 流量排行数据无效。");
   }
   return rows.map(row => ({
-    name: label === "referrer" ? publicSourceName(row[label]) : row[label],
+    name: row[label],
     ...(label === "path" ? { title: row.title ?? "" } : {}), count: row.count, uniques: row.uniques
   }));
 }

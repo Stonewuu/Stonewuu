@@ -2,19 +2,19 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { prepare } from "./prepare.mjs";
 import { newArchive } from "./archive.mjs";
-import { publicSourceName } from "./referrers.mjs";
 
 const repo = "example/project";
 
-test("公开排行保留来源的访问数字，历史排行和最新详情使用同一个公开名称", () => {
+test("来源排行按 GitHub 返回的顺序显示原名、浏览次数和独立访客数", () => {
   const traffic = newArchive(repo);
-  const source = { name: "192.168.1.20", count: 7, uniques: 4 };
-  const obs = { date: "2026-11-20", repository: repo, sources: { referrers: { status: "ready", data: [source] } } };
+  const sources = [
+    { name: "192.168.1.20", count: 7, uniques: 4 },
+    { name: "Google", count: 5, uniques: 3 }
+  ];
+  const obs = { date: "2026-11-20", repository: repo, sources: { referrers: { status: "ready", data: sources } } };
   const result = prepare(repo, traffic, [obs], null);
-  const expected = [{ name: "内网来源", count: 7, uniques: 4 }];
-  assert.deepEqual(result.ranks[obs.date].referrers, expected);
-  assert.deepEqual(result.details.referrers.data, expected);
-  assert.equal(publicSourceName("github.com"), "github.com");
+  assert.deepEqual(result.ranks[obs.date].referrers, sources);
+  assert.deepEqual(result.details.referrers.data, sources);
 });
 
 test("公共指标从可观测日期写入，GitHub 周日历的未来补位不计入图表", () => {
