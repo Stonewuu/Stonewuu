@@ -1,0 +1,54 @@
+name: 采集仓库统计
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+concurrency:
+  group: profile-repository-metrics
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: tools/repository-metrics
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: traffic-history
+          path: archive
+      - name: 验证流量归档规则
+        run: node --test tools/repository-metrics/archive.test.mjs
+      - name: 采集公开项目指标
+        id: project
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/repository-metrics/collect.mjs public archive
+      - name: 采集流量和来源排行
+        id: traffic
+        continue-on-error: true
+        env:
+          TRAFFIC_READ_TOKEN: ${{ secrets.TRAFFIC_READ_TOKEN }}
+        run: node tools/repository-metrics/collect.mjs traffic archive
+      - name: 保存本次取得的数据
+        working-directory: archive
+        run: |
+          set -euo pipefail
+          git add -- .
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m "更新仓库统计 $(date -u +%F)"
+            git push origin HEAD:refs/heads/traffic-history
+          fi
+      - name: 核对采集结果
+        if: steps.project.outcome != 'success' || steps.traffic.outcome != 'success'
+        run: exit 1
