@@ -1,4 +1,5 @@
 import { api, allPages, SourceError, inBatches } from "./api.mjs";
+import { extraSources } from "./more-sources.mjs";
 
 const issueQuery = [
   "query($owner:String!, $name:String!) { repository(owner:$owner,name:$name) {",
@@ -93,9 +94,9 @@ async function jobPerformance(base, runs, previous = {}) {
   return { days, completed };
 }
 
-async function lifecycle(base) {
+async function lifecycle(base, issueList) {
   const [issues, pulls] = await Promise.all([
-    allPages(base + "/issues?state=all&per_page=100"),
+    issueList(),
     allPages(base + "/pulls?state=all&per_page=100")
   ]);
   const days = {};
@@ -109,6 +110,11 @@ async function lifecycle(base) {
     if (!issue.pull_request) {
       add(issue.created_at, "issueOpened");
       add(issue.closed_at, "issueClosed");
+      if (issue.closed_at) {
+        const bucket = days[issue.closed_at.slice(0,10)];
+        bucket.issueCloseSeconds = (bucket.issueCloseSeconds ?? 0) +
+          (Date.parse(issue.closed_at)-Date.parse(issue.created_at))/1000;
+      }
     }
   }
   for (const pr of pulls) {
@@ -140,6 +146,8 @@ export async function publicSources(repository, previousJobs) {
   const statistic = async name => (await api(base + "/stats/" + name, { statistics: true })).body;
   let runs;
   const workflowRuns = () => runs ??= allPages(base + "/actions/runs?per_page=100", "workflow_runs");
+  let issues;
+  const issueRows = () => issues ??= allPages(base + "/issues?state=all&per_page=100");
   const jobs = {
     repository: async () => ({
       stars: repo.stargazers_count, forks: repo.forks_count, watchers: repo.subscribers_count,
@@ -173,7 +181,7 @@ export async function publicSources(repository, previousJobs) {
     releases: () => releaseStats(base),
     actions: async () => actionsStats(base, await workflowRuns()),
     jobPerformance: async () => jobPerformance(base, await workflowRuns(), previousJobs),
-    lifecycle: () => lifecycle(base),
+    lifecycle: () => lifecycle(base, issueRows),
     contributorCount: async () => (await allPages(base + "/contributors?anon=true&per_page=100")).length,
     actionsCache: async () => {
       const cache = await get("actions/cache/usage");
@@ -193,7 +201,8 @@ export async function publicSources(repository, previousJobs) {
     punchCard: () => statistic("punch_card"),
     contributors: async () => (await statistic("contributors") ?? []).map(person => ({
       login: person.author?.login ?? null, commits: person.total, weeks: person.weeks
-    }))
+    })),
+    ...extraSources(repository, repo, issueRows)
   };
   return Object.fromEntries(await inBatches(Object.entries(jobs), 4, async ([key, run]) => [key, await withStatus(run)]));
 }
