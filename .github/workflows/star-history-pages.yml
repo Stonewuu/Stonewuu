@@ -7,6 +7,8 @@ on:
     paths:
       - "public/**"
       - "tools/repository-metrics/**"
+      - "tools/publish-pages.cjs"
+      - "tools/tests/publish-pages.test.cjs"
       - ".github/workflows/star-history-pages.yml"
   workflow_run:
     workflows: ["采集仓库统计"]
@@ -18,21 +20,19 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: profile-star-history-pages
   cancel-in-progress: false
 
 jobs:
-  generate-and-deploy:
+  build:
+    name: 构建并上传网站
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact_id }}
 
     steps:
       - name: Checkout profile repository
@@ -68,17 +68,53 @@ jobs:
       - name: 生成独立的仓库统计页
         run: |
           npm ci --prefix tools/repository-metrics --no-audit --no-fund
-          node --test tools/repository-metrics/*.test.mjs
+          node --test tools/repository-metrics/*.test.mjs tools/tests/publish-pages.test.cjs
           node tools/repository-metrics/build.mjs .metrics-archive _site
+
+      - name: Upload Pages artifact
+        id: upload
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+
+  deploy:
+    name: 发布网站
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 读取发布脚本
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: tools/publish-pages.cjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: _site
-
-      - name: Deploy GitHub Pages
+      - name: 发布本次构建上传的网站
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PAGES_ARTIFACT_ID: ${{ needs.build.outputs.artifact_id }}
+        with:
+          script: |
+            const { publishPages } = require('./tools/publish-pages.cjs')
+            await publishPages({ github, context, core, artifactId: process.env.PAGES_ARTIFACT_ID })
+
+      - name: 取消尚未完成的发布
+        if: ${{ (failure() || cancelled()) && steps.deployment.outputs.deployment_id && !steps.deployment.outputs.finished }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.deployment_id }}
+        run: gh api --method POST "repos/$GITHUB_REPOSITORY/pages/deployments/$DEPLOYMENT_ID/cancel"
